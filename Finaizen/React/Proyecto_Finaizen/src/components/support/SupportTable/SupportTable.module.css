@@ -1,6 +1,7 @@
 .supportTable {
   width: 100%;
   border-collapse: collapse;
+  min-width: 700px;
 }
 
 .supportTable th,
@@ -65,4 +66,49 @@
   text-align: center;
   padding: 2rem;
   color: #888;
+}
+
+.tableWrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .supportTable {
+    font-size: 0.85rem;
+    min-width: 600px;
+  }
+
+  .supportTable th,
+  .supportTable td {
+    padding: 10px 8px;
+  }
+
+  .status {
+    font-size: 0.8rem;
+    padding: 4px 10px;
+  }
+
+  .actionLink {
+    font-size: 0.85rem;
+    display: block;
+    margin-bottom: 5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .supportTable {
+    font-size: 0.75rem;
+  }
+
+  .supportTable th,
+  .supportTable td {
+    padding: 8px 6px;
+  }
+
+  .status {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+  }
 }

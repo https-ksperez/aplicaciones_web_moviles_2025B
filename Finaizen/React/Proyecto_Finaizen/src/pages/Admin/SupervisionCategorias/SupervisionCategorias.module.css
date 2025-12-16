@@ -18,6 +18,17 @@
   margin-left: 80px;
 }
 
+/* Forzar margin correcto en desktop */
+@media (min-width: 769px) {
+  .mainContent {
+    margin-left: 250px !important;
+  }
+
+  .mainContent.expanded {
+    margin-left: 80px !important;
+  }
+}
+
 .mainContent h1 {
   margin: 0 0 2rem 0;
   color: #0a2a43;
@@ -33,7 +44,35 @@
 
 @media (max-width: 768px) {
   .mainContent {
-    margin-left: 80px;
+    margin-left: 0 !important;
     padding: 1rem;
+    width: 100%;
+  }
+
+  .mainContent.expanded {
+    margin-left: 0 !important;
+  }
+
+  .mainContent h1 {
+    font-size: 1.5rem;
+  }
+
+  .tableSection {
+    padding: 1rem;
+    border-radius: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mainContent {
+    padding: 0.75rem;
+  }
+
+  .mainContent h1 {
+    font-size: 1.25rem;
+  }
+
+  .tableSection {
+    padding: 0.75rem;
   }
 }
