@@ -24,14 +24,25 @@
   margin-left: 80px; /* Ancho del sidebar colapsado */
 }
 
+/* Forzar margin correcto en desktop */
+@media (min-width: 769px) {
+  .dashboardAdmin {
+    margin-left: 250px !important;
+  }
+
+  .dashboardAdmin.expanded {
+    margin-left: 80px !important;
+  }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .dashboardAdmin {
-    margin-left: 0;
+    margin-left: 0 !important;
     padding: 20px;
   }
 
   .dashboardAdmin.expanded {
-    margin-left: 0;
+    margin-left: 0 !important;
   }
 }

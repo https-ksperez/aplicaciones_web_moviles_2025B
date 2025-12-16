@@ -88,3 +88,34 @@
 .btnClose:hover {
   opacity: 0.9;
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modalContent {
+    padding: 1.5rem;
+  }
+
+  .btnClose {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .modalContent {
+    padding: 1rem;
+  }
+
+  .modalContent h3 {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+  }
+
+  .reportDetails p {
+    font-size: 0.9rem;
+    margin: 0.5rem 0;
+  }
+
+  .status {
+    font-size: 0.8em;
+  }
+}

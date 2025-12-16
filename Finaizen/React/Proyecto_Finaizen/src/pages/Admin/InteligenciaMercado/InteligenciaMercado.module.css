@@ -24,6 +24,17 @@
   margin-left: 80px;
 }
 
+/* Forzar margin correcto en desktop */
+@media (min-width: 769px) {
+  .mainContent {
+    margin-left: 250px !important;
+  }
+
+  .mainContent.expanded {
+    margin-left: 80px !important;
+  }
+}
+
 .chartsGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -42,12 +53,12 @@
 
 @media (max-width: 768px) {
   .mainContent {
-    margin-left: 0;
+    margin-left: 0 !important;
     padding: 20px;
   }
 
   .mainContent.expanded {
-    margin-left: 0;
+    margin-left: 0 !important;
   }
 
   .chartsGrid {

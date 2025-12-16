@@ -27,3 +27,26 @@
   outline: none;
   border-color: #007bff;
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .filtersBar {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .select,
+  .searchInput {
+    width: 100%;
+    min-width: unset;
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .select,
+  .searchInput {
+    font-size: 0.9rem;
+    padding: 6px 10px;
+  }
+}

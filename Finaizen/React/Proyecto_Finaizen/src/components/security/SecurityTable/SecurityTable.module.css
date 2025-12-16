@@ -1,6 +1,7 @@
 .securityLogTable {
   width: 100%;
   border-collapse: collapse;
+  min-width: 700px;
 }
 
 .securityLogTable th,
@@ -66,4 +67,47 @@
   text-align: center;
   padding: 2rem;
   color: #888;
+}
+
+.tableWrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .securityLogTable {
+    font-size: 0.85rem;
+    min-width: 600px;
+  }
+
+  .securityLogTable th,
+  .securityLogTable td {
+    padding: 10px 8px;
+  }
+
+  .eventType {
+    font-size: 0.8rem;
+    padding: 4px 10px;
+  }
+
+  .actionLink {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .securityLogTable {
+    font-size: 0.75rem;
+  }
+
+  .securityLogTable th,
+  .securityLogTable td {
+    padding: 8px 6px;
+  }
+
+  .eventType {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+  }
 }

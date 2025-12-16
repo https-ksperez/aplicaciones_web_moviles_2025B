@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Chart from 'chart.js/auto';
 import styles from './SupervisionCharts.module.css';
 
@@ -7,6 +7,17 @@ function SupervisionCharts({ confidenceData, correctionsData, isCollapsed }) {
   const correctionsChartRef = useRef(null);
   const confidenceChartInstance = useRef(null);
   const correctionsChartInstance = useRef(null);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  // Listener para resize de ventana
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     // Limpiar gráficos anteriores
@@ -39,6 +50,9 @@ function SupervisionCharts({ confidenceData, correctionsData, isCollapsed }) {
               legend: {
                 position: 'top'
               }
+            },
+            animation: {
+              duration: 0 // Desactivar animación para mejor performance
             }
           }
         });
@@ -71,6 +85,9 @@ function SupervisionCharts({ confidenceData, correctionsData, isCollapsed }) {
               y: {
                 beginAtZero: true
               }
+            },
+            animation: {
+              duration: 0 // Desactivar animación para mejor performance
             }
           }
         });
@@ -87,7 +104,7 @@ function SupervisionCharts({ confidenceData, correctionsData, isCollapsed }) {
         correctionsChartInstance.current.destroy();
       }
     };
-  }, [confidenceData, correctionsData, isCollapsed]);
+  }, [confidenceData, correctionsData, isCollapsed, windowWidth]);
 
   return (
     <div className={styles.chartsGrid}>
