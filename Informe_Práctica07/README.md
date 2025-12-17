@@ -24,8 +24,30 @@ Por otro lado, la configuración del servidor se encuentra en el archivo apiConf
 ya mismo cambio esto
 ## Capturas de las funcionalidades implementadas
 
-### 1. Estructura de carpetas tras la migración
+### 1. Verificación de una petición GET
+![Administrar Resgistros](./assets/administra_registros.png)
+*Página Administrar Resgistros*
+En la página se puede observar que al dar click a la pestaña Administrar Ingresos/Egresos, se carga información sobre otros ingresos y egresos, confirmando la respuesta de una petición GET.
 
+### 2. Verificación de una petición POST
+![Nuevo Egreso](./assets/nuevo-egreso.png)
+*Form para crear un nuevo egreso llamado "amigo secreto"*
+
+![Confirmación de Nuevo Egreso](./assets/notificar-egreso.png)
+*Mensaje de notificación del registro de un nuevo egreso*
+
+![Verificación de creación de Nuevo Egreso en dashboard](./assets/verificar-nuevo-egreso-dashboard.png)
+*Verificación en el dashborad de la actualización de la lista de registros en Transacciones Recientes*
+
+### 3. Verificación de una petición DELETE
+![Verificaión de historial](./assets/registros_en_historial.png)
+*Verificación en el historial de transacciones de que se realizó la creación de un nuevo egreso llamado "amigo secreto"*
+
+![Confirmar Eliminar Egreso](./assets/mensaje_confirmar_eliminar.png)
+*Mensaje para confirmar la eliminación del egreso llamado "amigo secreto"*
+
+![Eliminar Egreso](./assets/eliminar_egreso.png)
+*Se verifica la eliminación del egreso llamado "amigo secreto" y la actualización de la lista en el historial de transacciones*
 
 ## Conclusiones y recomendaciones
 
