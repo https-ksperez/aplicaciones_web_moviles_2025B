@@ -1,0 +1,166 @@
+.historialTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.historialTable thead {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+  color: white;
+}
+
+.historialTable th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.historialTable tbody tr {
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.2s ease;
+}
+
+.historialTable tbody tr:hover {
+  background-color: var(--bg-hover, #f8f9fa);
+}
+
+.historialTable td {
+  padding: 1rem;
+  vertical-align: middle;
+}
+
+.dateColumn {
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge.ingreso {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.badge.egreso {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.descriptionColumn {
+  font-weight: 500;
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.categoryColumn {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.montoColumn {
+  font-weight: 700;
+  font-size: 1.05rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.montoColumn.ingreso {
+  color: #28a745;
+}
+
+.montoColumn.egreso {
+  color: #dc3545;
+}
+
+.actionsColumn {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.editButton,
+.deleteButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.editButton:hover {
+  background-color: #e3f2fd;
+  transform: scale(1.1);
+}
+
+.deleteButton:hover {
+  background-color: #ffebee;
+  transform: scale(1.1);
+}
+
+.emptyState {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .historialTable thead {
+    display: none;
+  }
+
+  .historialTable,
+  .historialTable tbody,
+  .historialTable tr,
+  .historialTable td {
+    display: block;
+    width: 100%;
+  }
+
+  .historialTable tr {
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    background: white;
+  }
+
+  .historialTable td {
+    padding: 0.5rem 0;
+    text-align: left;
+    border: none;
+  }
+
+  .historialTable td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    display: inline-block;
+    width: 100px;
+    color: var(--text-secondary);
+  }
+
+  .montoColumn {
+    text-align: left;
+  }
+
+  .actionsColumn {
+    justify-content: flex-start;
+    margin-top: 0.5rem;
+  }
+}

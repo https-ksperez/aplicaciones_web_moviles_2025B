@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import mockDB from '../../../utils/mockDatabase';
 import { Button, Toast, ConfirmDialog } from '../../../components/ui';
+import { RecordCard } from '../../../components/records';
 import styles from './AdministrarRegistros.module.css';
 
 /**
@@ -290,39 +291,14 @@ function AdministrarRegistros() {
                   <p className={styles.emptyMessage}>No hay ingresos registrados</p>
                 ) : (
                   filteredIngresos.map(ingreso => (
-                    <div key={ingreso.id} className={styles.recordCard}>
-                      <div className={styles.recordInfo}>
-                        <h3>{ingreso.descripcion}</h3>
-                        <p>{getFrequencyText(ingreso)}</p>
-                      </div>
-                      <div className={styles.recordDetails}>
-                        <span className={`${styles.amount} ${styles.positive}`}>
-                          + {currentPerfil.simboloMoneda}{ingreso.monto.toFixed(2)}
-                        </span>
-                        <div className={styles.recordActions}>
-                          <a 
-                            href="#" 
-                            className={styles.edit}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleEdit(ingreso, 'ingreso');
-                            }}
-                          >
-                            Editar
-                          </a>
-                          <a 
-                            href="#" 
-                            className={styles.delete}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleDelete(ingreso, 'ingreso');
-                            }}
-                          >
-                            Eliminar
-                          </a>
-                        </div>
-                      </div>
-                    </div>
+                    <RecordCard
+                      key={ingreso.id}
+                      record={ingreso}
+                      tipo="ingreso"
+                      simboloMoneda={currentPerfil.simboloMoneda}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
                   ))
                 )}
               </div>
@@ -337,39 +313,14 @@ function AdministrarRegistros() {
                   <p className={styles.emptyMessage}>No hay egresos registrados</p>
                 ) : (
                   filteredEgresos.map(egreso => (
-                    <div key={egreso.id} className={styles.recordCard}>
-                      <div className={styles.recordInfo}>
-                        <h3>{egreso.descripcion}</h3>
-                        <p>{getFrequencyText(egreso)}</p>
-                      </div>
-                      <div className={styles.recordDetails}>
-                        <span className={`${styles.amount} ${styles.negative}`}>
-                          - {currentPerfil.simboloMoneda}{egreso.monto.toFixed(2)}
-                        </span>
-                        <div className={styles.recordActions}>
-                          <a 
-                            href="#" 
-                            className={styles.edit}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleEdit(egreso, 'egreso');
-                            }}
-                          >
-                            Editar
-                          </a>
-                          <a 
-                            href="#" 
-                            className={styles.delete}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleDelete(egreso, 'egreso');
-                            }}
-                          >
-                            Eliminar
-                          </a>
-                        </div>
-                      </div>
-                    </div>
+                    <RecordCard
+                      key={egreso.id}
+                      record={egreso}
+                      tipo="egreso"
+                      simboloMoneda={currentPerfil.simboloMoneda}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
                   ))
                 )}
               </div>

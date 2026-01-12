@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import mockDB from '../../../utils/mockDatabase';
 import { Card } from '../../../components/ui';
+import { NotificationCard, NotificationStats } from '../../../components/notifications';
 import styles from './Notificaciones.module.css';
 
 /**
@@ -115,39 +116,7 @@ export default function Notificaciones() {
       </div>
 
       {/* Estadísticas */}
-      <div className={styles.statsGrid}>
-        <Card className={styles.statCard}>
-          <div className={styles.statIcon}>📊</div>
-          <div className={styles.statContent}>
-            <span className={styles.statLabel}>Total</span>
-            <span className={styles.statValue}>{stats.total}</span>
-          </div>
-        </Card>
-
-        <Card className={styles.statCard}>
-          <div className={styles.statIcon}>🔴</div>
-          <div className={styles.statContent}>
-            <span className={styles.statLabel}>Sin leer</span>
-            <span className={styles.statValue}>{stats.unread}</span>
-          </div>
-        </Card>
-
-        <Card className={styles.statCard}>
-          <div className={styles.statIcon}>✅</div>
-          <div className={styles.statContent}>
-            <span className={styles.statLabel}>Leídas</span>
-            <span className={styles.statValue}>{stats.read}</span>
-          </div>
-        </Card>
-
-        <Card className={styles.statCard}>
-          <div className={styles.statIcon}>🏆</div>
-          <div className={styles.statContent}>
-            <span className={styles.statLabel}>Logros</span>
-            <span className={styles.statValue}>{stats.byType.logro}</span>
-          </div>
-        </Card>
-      </div>
+      <NotificationStats stats={stats} />
 
       {/* Filtros */}
       <Card className={styles.filtersCard}>
@@ -229,90 +198,15 @@ export default function Notificaciones() {
           </Card>
         ) : (
           filteredNotifications.map(notif => (
-            <Card 
-              key={notif.id} 
-              className={`${styles.notificationCard} ${!notif.leida ? styles.unread : ''}`}
-            >
-              <div className={styles.notifIcon}>
-                {notif.icono}
-              </div>
-              
-              <div className={styles.notifContent}>
-                <div className={styles.notifHeader}>
-                  <h3 className={styles.notifTitle}>{notif.titulo}</h3>
-                  <span className={styles.notifType}>
-                    {getTypeBadge(notif.tipo)}
-                  </span>
-                  <span className={styles.notifTime}>
-                    {getTimeAgo(notif.createdAt)}
-                  </span>
-                </div>
-                
-                <p className={styles.notifMessage}>{notif.mensaje}</p>
-                
-                {notif.accionUrl && (
-                  <a href={notif.accionUrl} className={styles.notifAction}>
-                    Ver detalles →
-                  </a>
-                )}
-              </div>
-
-              <div className={styles.notifActions}>
-                {!notif.leida && (
-                  <button
-                    className={styles.actionBtn}
-                    onClick={() => handleMarkAsRead(notif.id)}
-                    title="Marcar como leída"
-                  >
-                    ✓
-                  </button>
-                )}
-                <button
-                  className={`${styles.actionBtn} ${styles.deleteBtn}`}
-                  onClick={() => handleDeleteNotification(notif.id)}
-                  title="Eliminar"
-                >
-                  🗑️
-                </button>
-              </div>
-            </Card>
+            <NotificationCard
+              key={notif.id}
+              notification={notif}
+              onMarkAsRead={handleMarkAsRead}
+              onDelete={handleDeleteNotification}
+            />
           ))
         )}
       </div>
     </div>
   );
-}
-
-// Funciones auxiliares
-function getTimeAgo(date) {
-  const now = new Date();
-  const notifDate = new Date(date);
-  const diffMs = now - notifDate;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'Ahora';
-  if (diffMins < 60) return `Hace ${diffMins} min`;
-  if (diffHours < 24) return `Hace ${diffHours}h`;
-  if (diffDays < 7) return `Hace ${diffDays}d`;
-  
-  return notifDate.toLocaleDateString('es-ES', { 
-    day: '2-digit', 
-    month: 'short',
-    year: 'numeric'
-  });
-}
-
-function getTypeBadge(tipo) {
-  const badges = {
-    warning: '⚠️ Alerta',
-    info: 'ℹ️ Info',
-    success: '✅ Éxito',
-    error: '❌ Error',
-    logro: '🏆 Logro',
-    presupuesto: '💰 Presupuesto',
-    transaccion: '💳 Transacción'
-  };
-  return badges[tipo] || 'ℹ️ Info';
 }

@@ -4,6 +4,7 @@ import { useAuth } from '../../../context/AuthContext';
 import mockDB from '../../../utils/mockDatabase';
 import { Card, Button, ConfirmDialog, Toast } from '../../../components/ui';
 import EditRecordModal from '../../../components/modals/EditRecordModal';
+import { HistorialTable } from '../../../components/historial';
 import styles from './Historial.module.css';
 
 /**
@@ -377,107 +378,47 @@ function Historial() {
         {/* Tabla de Historial */}
         <Card>
           <div className={styles.tableContainer}>
-            {currentItems.length === 0 ? (
-              <div className={styles.emptyState}>
-                <p>📭 No se encontraron transacciones con los filtros aplicados</p>
-                <Button variant="outline" onClick={handleClearFilters}>
-                  Limpiar Filtros
+            <HistorialTable
+              registros={currentItems}
+              simboloMoneda={currentPerfil.simboloMoneda}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              emptyMessage="No se encontraron transacciones con los filtros aplicados"
+            />
+
+            {/* Paginación */}
+            {totalPages > 1 && filteredHistorial.length > 0 && (
+              <div className={styles.pagination}>
+                <Button
+                  variant="outline"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  ← Anterior
+                </Button>
+                
+                <div className={styles.pageNumbers}>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`${styles.pageButton} ${
+                        pageNum === currentPage ? styles.active : ''
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Siguiente →
                 </Button>
               </div>
-            ) : (
-              <>
-                <table className={styles.historialTable}>
-                  <thead>
-                    <tr>
-                      <th>Fecha</th>
-                      <th>Tipo</th>
-                      <th>Descripción</th>
-                      <th>Categoría</th>
-                      <th>Monto</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentItems.map(registro => (
-                      <tr key={registro.id}>
-                        <td className={styles.dateColumn} data-label="Fecha">
-                          {new Date(registro.fechaEjecucion).toLocaleDateString('es-ES', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </td>
-                        <td data-label="Tipo">
-                          <span className={`${styles.badge} ${styles[registro.tipo]}`}>
-                            {registro.tipo === 'ingreso' ? '💰 Ingreso' : '💸 Egreso'}
-                          </span>
-                        </td>
-                        <td className={styles.descriptionColumn} data-label="Descripción">
-                          {registro.descripcion}
-                        </td>
-                        <td className={styles.categoryColumn} data-label="Categoría">
-                          {registro.categoria}
-                        </td>
-                        <td className={`${styles.montoColumn} ${styles[registro.tipo]}`} data-label="Monto">
-                          {registro.tipo === 'ingreso' ? '+' : '-'}
-                          {currentPerfil.simboloMoneda}{registro.monto.toLocaleString()}
-                        </td>
-                        <td className={styles.actionsColumn}>
-                          <button
-                            className={styles.editButton}
-                            onClick={() => handleEdit(registro)}
-                            title="Editar"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            className={styles.deleteButton}
-                            onClick={() => handleDelete(registro)}
-                            title="Eliminar"
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                {/* Paginación */}
-                {totalPages > 1 && (
-                  <div className={styles.pagination}>
-                    <Button
-                      variant="outline"
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                    >
-                      ← Anterior
-                    </Button>
-                    
-                    <div className={styles.pageNumbers}>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
-                        <button
-                          key={pageNum}
-                          onClick={() => handlePageChange(pageNum)}
-                          className={`${styles.pageButton} ${
-                            pageNum === currentPage ? styles.active : ''
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      ))}
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                    >
-                      Siguiente →
-                    </Button>
-                  </div>
-                )}
-              </>
             )}
           </div>
         </Card>

@@ -1,0 +1,121 @@
+.recordCard {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  border-left: 4px solid transparent;
+}
+
+.recordCard.ingreso {
+  border-left-color: #28a745;
+}
+
+.recordCard.egreso {
+  border-left-color: #dc3545;
+}
+
+.recordCard:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.recordInfo h3 {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.frequency {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0;
+}
+
+.category {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+}
+
+.categoryIcon {
+  font-size: 1rem;
+}
+
+.recordDetails {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.amount.positive {
+  color: #28a745;
+}
+
+.amount.negative {
+  color: #dc3545;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.editButton,
+.deleteButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.editButton:hover {
+  background-color: #e3f2fd;
+  transform: scale(1.1);
+}
+
+.deleteButton:hover {
+  background-color: #ffebee;
+  transform: scale(1.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .recordCard {
+    padding: 1rem;
+  }
+
+  .recordInfo h3 {
+    font-size: 1rem;
+  }
+
+  .amount {
+    font-size: 1.3rem;
+  }
+
+  .recordDetails {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .actions {
+    align-self: flex-end;
+  }
+}

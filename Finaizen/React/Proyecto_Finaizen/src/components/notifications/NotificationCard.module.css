@@ -1,0 +1,133 @@
+.notificationCard {
+  display: flex;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  border-left: 4px solid transparent;
+}
+
+.notificationCard.unread {
+  background-color: #f0f7ff;
+  border-left-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.notificationCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.notifIcon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.notifContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.notifHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.notifTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.notifType {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  background-color: var(--bg-secondary, #f8f9fa);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.notifTime {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-left: auto;
+}
+
+.notifMessage {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0.5rem 0;
+}
+
+.notifAction {
+  display: inline-block;
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  transition: color 0.2s ease;
+}
+
+.notifAction:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+.notifActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.actionBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background-color: var(--bg-secondary, #f8f9fa);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.actionBtn:hover {
+  background-color: var(--primary-color);
+  color: white;
+  transform: scale(1.1);
+}
+
+.actionBtn.deleteBtn:hover {
+  background-color: #dc3545;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .notificationCard {
+    flex-direction: column;
+    padding: 1rem;
+  }
+
+  .notifHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .notifTime {
+    margin-left: 0;
+  }
+
+  .notifActions {
+    align-self: flex-end;
+  }
+}
