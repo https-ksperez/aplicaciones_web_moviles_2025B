@@ -86,3 +86,32 @@
   background-color: #6c757d;
   color: white;
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modalContent {
+    padding: 1.5rem;
+  }
+
+  .modalActions {
+    flex-direction: column;
+  }
+
+  .modalActions button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .modalContent {
+    padding: 1rem;
+  }
+
+  .modalContent h3 {
+    font-size: 1.1rem;
+  }
+
+  .formGroup select {
+    font-size: 0.9rem;
+  }
+}

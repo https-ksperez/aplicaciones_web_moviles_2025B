@@ -18,6 +18,17 @@
   margin-left: 80px;
 }
 
+/* Forzar margin correcto en desktop */
+@media (min-width: 769px) {
+  .mainContent {
+    margin-left: 250px !important;
+  }
+
+  .mainContent.expanded {
+    margin-left: 80px !important;
+  }
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -49,17 +60,36 @@
 /* Responsive */
 @media (max-width: 768px) {
   .mainContent {
-    margin-left: 80px;
+    margin-left: 0 !important;
     padding: 1rem;
+    width: 100%;
+  }
+
+  .mainContent.expanded {
+    margin-left: 0 !important;
   }
 
   .header {
     flex-direction: column;
     gap: 1rem;
-    align-items: flex-start;
+    align-items: stretch;
+  }
+
+  .header h1 {
+    font-size: 1.5rem;
   }
 
   .btnInvite {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .mainContent {
+    padding: 0.75rem;
+  }
+
+  .header h1 {
+    font-size: 1.25rem;
   }
 }

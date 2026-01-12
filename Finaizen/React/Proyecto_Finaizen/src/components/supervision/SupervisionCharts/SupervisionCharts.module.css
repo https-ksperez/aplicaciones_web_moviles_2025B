@@ -4,6 +4,8 @@
   gap: 30px;
   align-items: start;
   margin-bottom: 2rem;
+  width: 100%;
+  overflow: hidden;
 }
 
 .card {
@@ -15,6 +17,9 @@
   flex-direction: column;
   min-height: 350px;
   height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .card h4 {
@@ -30,10 +35,56 @@
   max-height: 280px;
   position: relative;
   overflow: hidden;
+  width: 100%;
+}
+
+.chartContainer canvas {
+  max-width: 100%;
+  max-height: 100%;
 }
 
 @media (max-width: 968px) {
   .chartsGrid {
     grid-template-columns: 1fr;
+    gap: 20px;
+    width: 100%;
+  }
+
+  .card {
+    min-height: 300px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .chartContainer {
+    height: 250px;
+    min-height: 250px;
+    max-height: 250px;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .chartsGrid {
+    gap: 15px;
+    width: 100%;
+  }
+
+  .card {
+    padding: 1rem;
+    min-height: 280px;
+    width: 100%;
+  }
+
+  .card h4 {
+    font-size: 1rem;
+    margin-bottom: 10px;
+  }
+
+  .chartContainer {
+    height: 220px;
+    min-height: 220px;
+    max-height: 220px;
+    width: 100%;
   }
 }

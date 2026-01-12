@@ -107,6 +107,48 @@ function TransactionForm({ type = 'ingreso', onSubmitSuccess }) {
     }
   }, [isEditMode, editId, type, currentPerfil, currentDate, getDefaultTime]);
 
+  // useEffect: Cargar datos pre-llenados desde OCR o voz
+  useEffect(() => {
+    const ocr = searchParams.get('ocr');
+    if (ocr && !isEditMode) {
+      try {
+        const ocrData = JSON.parse(decodeURIComponent(ocr));
+        
+        // Extraer hora y minutos de la fecha si existen
+        let horaOCR = getDefaultTime().split(':')[0];
+        let minutosOCR = getDefaultTime().split(':')[1];
+        if (ocrData.hora) {
+          const [h, m] = ocrData.hora.split(':');
+          horaOCR = h;
+          minutosOCR = m;
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          monto: ocrData.monto ? ocrData.monto.toString() : prev.monto,
+          descripcion: ocrData.descripcion || prev.descripcion,
+          categoria: ocrData.categoria || prev.categoria,
+          fechaEspecifica: ocrData.fecha || prev.fechaEspecifica,
+          hora: horaOCR,
+          minutos: minutosOCR,
+          frecuencia: 'ocasional' // Los escaneos siempre son ocasionales
+        }));
+
+        // Mostrar toast informativo
+        setToast({
+          type: 'info',
+          message: '📷 Datos cargados desde escaneo. Revisa y confirma la información.'
+        });
+
+        // Limpiar el parámetro OCR de la URL
+        searchParams.delete('ocr');
+        navigate({ search: searchParams.toString() }, { replace: true });
+      } catch (error) {
+        console.error('Error cargando datos OCR:', error);
+      }
+    }
+  }, [searchParams, isEditMode, getDefaultTime, navigate]);
+
   // useEffect: Actualizar valores por defecto cuando cambie la frecuencia
   useEffect(() => {
     if (formData.frecuencia === 'mensual' && !formData.diaMes) {

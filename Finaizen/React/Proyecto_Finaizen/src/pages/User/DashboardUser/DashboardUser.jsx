@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import mockDB from '../../../utils/mockDatabase';
-import { FloatingActionButton, Toast } from '../../../components/ui';
+import { Toast } from '../../../components/ui';
 import { StatsCards, ChartsSection, PresupuestosSection, TransaccionesRecientes } from '../../../components/dashboard';
 import NotificationBell from '../../../components/NotificationBell';
 import ChatBot from '../../../components/ChatBot/ChatBot';
+import QuickExpenseButton from '../../../components/QuickExpenseButton';
 import styles from './DashboardUser.module.css';
 
 /**
@@ -196,9 +197,9 @@ function DashboardUser() {
   // Logros desbloqueados
   const logrosDesbloqueados = logros.filter(l => l.desbloqueado).length;
 
-  // Items del FAB (Floating Action Button)
+  // Items adicionales para el FAB
   const fabMenuItems = currentUser?.premiumActivo ? [
-    { icon: '🤖', label: 'ChatBot IA Premium', action: () => setShowChatBot(true), isPremium: true },
+    { icon: '🤖', label: 'ChatBot IA', action: () => setShowChatBot(true), isPremium: true },
     { icon: '💰', label: 'Nuevo Ingreso', path: '/user/nuevo-ingreso' },
     { icon: '💸', label: 'Nuevo Egreso', path: '/user/nuevo-egreso' },
     { icon: '📋', label: 'Historial', path: '/user/historial' }
@@ -274,12 +275,8 @@ function DashboardUser() {
           </div>
         </div>
 
-        {/* Floating Action Button */}
-        <FloatingActionButton 
-          menuItems={fabMenuItems}
-          position="bottom-right"
-          color="primary"
-        />
+        {/* Quick Expense Button (con todas las opciones) */}
+        <QuickExpenseButton additionalItems={fabMenuItems} />
 
         {/* Toast Notification */}
         {toast && (
