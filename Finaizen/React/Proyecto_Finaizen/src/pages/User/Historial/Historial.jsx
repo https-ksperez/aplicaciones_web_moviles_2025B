@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import mockDB from '../../../utils/mockDatabase';
+import apiService from '../../../services/apiService';
 import { Card, Button, ConfirmDialog, Toast } from '../../../components/ui';
 import EditRecordModal from '../../../components/modals/EditRecordModal';
 import { HistorialTable } from '../../../components/historial';
@@ -50,24 +50,30 @@ function Historial() {
       return;
     }
 
-    try {
-      // Obtener historial del perfil actual
-      const registros = mockDB.historial.filter(
-        reg => reg.perfilId === currentPerfil.id
-      );
+    const loadHistorial = async () => {
+      try {
+        // Obtener historial del perfil actual desde el backend
+        const registros = await apiService.getHistorialByUserId(currentUser.id);
 
-      // Ordenar por fecha más reciente primero
-      registros.sort((a, b) => 
-        new Date(b.fechaEjecucion) - new Date(a.fechaEjecucion)
-      );
+        // Ordenar por fecha más reciente primero
+        registros.sort((a, b) => 
+          new Date(b.fechaEjecucion) - new Date(a.fechaEjecucion)
+        );
 
-      setHistorial(registros);
-      setFilteredHistorial(registros);
-    } catch (error) {
-      console.error('Error al cargar historial:', error);
-    } finally {
-      setLoading(false);
-    }
+        setHistorial(registros);
+        setFilteredHistorial(registros);
+      } catch (error) {
+        console.error('Error al cargar historial:', error);
+        setToast({
+          type: 'error',
+          message: 'Error al cargar el historial'
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadHistorial();
   }, [currentPerfil, authLoading, currentUser, navigate]);
 
   // Aplicar filtros cuando cambian
@@ -152,26 +158,22 @@ function Historial() {
     setRecordToDelete(null);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!recordToDelete) return;
 
     try {
-      // Eliminar del mockDB.historial
-      const index = mockDB.historial.findIndex(r => r.id === recordToDelete.id);
-      if (index !== -1) {
-        mockDB.historial.splice(index, 1);
-        mockDB.saveToLocalStorage();
+      // Eliminar del backend
+      await apiService.deleteHistorial(recordToDelete.id);
 
-        // Actualizar estados locales
-        setHistorial(prev => prev.filter(r => r.id !== recordToDelete.id));
-        setFilteredHistorial(prev => prev.filter(r => r.id !== recordToDelete.id));
+      // Actualizar estados locales
+      setHistorial(prev => prev.filter(r => r.id !== recordToDelete.id));
+      setFilteredHistorial(prev => prev.filter(r => r.id !== recordToDelete.id));
 
-        // Mostrar notificación
-        setToast({
-          type: 'success',
-          message: '✓ Registro eliminado exitosamente'
-        });
-      }
+      // Mostrar notificación
+      setToast({
+        type: 'success',
+        message: '✓ Registro eliminado exitosamente'
+      });
     } catch (error) {
       console.error('Error al eliminar registro:', error);
       setToast({
@@ -193,24 +195,20 @@ function Historial() {
     setRecordToEdit(null);
   };
 
-  const handleSaveEdit = (updatedRecord) => {
+  const handleSaveEdit = async (updatedRecord) => {
     try {
-      // Actualizar en mockDB.historial
-      const index = mockDB.historial.findIndex(r => r.id === updatedRecord.id);
-      if (index !== -1) {
-        mockDB.historial[index] = updatedRecord;
-        mockDB.saveToLocalStorage();
+      // Actualizar en el backend
+      await apiService.updateHistorial(updatedRecord.id, updatedRecord);
 
-        // Actualizar estados locales
-        setHistorial(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
-        setFilteredHistorial(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
+      // Actualizar estados locales
+      setHistorial(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
+      setFilteredHistorial(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
 
-        // Mostrar notificación
-        setToast({
-          type: 'success',
-          message: '✓ Registro actualizado exitosamente'
-        });
-      }
+      // Mostrar notificación
+      setToast({
+        type: 'success',
+        message: '✓ Registro actualizado exitosamente'
+      });
     } catch (error) {
       console.error('Error al actualizar registro:', error);
       setToast({
