@@ -1,21 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../context/AuthContext';
 import Sidebar from '../../../components/layout/Sidebar';
 import SupportKPIs from '../../../components/support/SupportKPIs';
 import SupportFilters from '../../../components/support/SupportFilters';
 import SupportTable from '../../../components/support/SupportTable';
 import AssignModal from '../../../components/support/AssignModal';
 import ViewModal from '../../../components/support/ViewModal';
-import { supportTickets as initialTickets, kpiData, assignOptions } from '../../../utils/supportData';
+import apiService from '../../../services/apiService';
 import styles from './ReportesSoporte.module.css';
 
 const ReportesSoporte = () => {
+  const { currentUser, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [tickets] = useState(initialTickets);
+  const [loading, setLoading] = useState(true);
+  const [tickets, setTickets] = useState([]);
+  const [kpiData, setKpiData] = useState({ abiertos: 0, resueltos: 0, tiempoPromedio: '0h', agentes: 0 });
+  const [assignOptions, setAssignOptions] = useState([]);
   const [statusFilter, setStatusFilter] = useState('todos');
   const [searchValue, setSearchValue] = useState('');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
+
+  // Proteger ruta - redirigir si no es admin
+  useEffect(() => {
+    if (!currentUser || !isAdmin) {
+      navigate('/login');
+    }
+  }, [currentUser, isAdmin, navigate]);
 
   // Configuración del menú
   const adminMenuItems = [
@@ -33,17 +47,59 @@ const ReportesSoporte = () => {
     { label: 'Configuración', path: '/user/config/seguridad', icon: '⚙️' }
   ];
 
+  // Cargar datos del backend
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [ticketsRes, kpisRes, agentsRes] = await Promise.all([
+          apiService.support.getAll(),
+          apiService.support.getKPIs(),
+          apiService.support.getAgents()
+        ]);
+        
+        setTickets(ticketsRes.data || ticketsRes || []);
+        setKpiData(kpisRes.data || kpisRes || { abiertos: 0, resueltos: 0, tiempoPromedio: '0h', agentes: 0 });
+        
+        // Transformar agentes a opciones de asignación
+        const agents = agentsRes.data || agentsRes || [];
+        setAssignOptions(agents.map(a => ({ 
+          value: a.id, 
+          label: `${a.nombre} (Nivel ${a.nivel})` 
+        })));
+      } catch (error) {
+        console.error('Error al cargar datos de soporte:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (currentUser && isAdmin) {
+      loadData();
+    }
+  }, [currentUser, isAdmin]);
+
   // Filtrar tickets
   const filteredTickets = tickets.filter(ticket => {
-    const matchesStatus = statusFilter === 'todos' || ticket.status === statusFilter;
+    const status = ticket.estado || ticket.status;
+    const user = ticket.emailUsuario || ticket.user || '';
+    const subject = ticket.asunto || ticket.subject || '';
+    
+    const matchesStatus = statusFilter === 'todos' || status === statusFilter;
     const matchesSearch = 
-      ticket.user.toLowerCase().includes(searchValue.toLowerCase()) ||
-      ticket.subject.toLowerCase().includes(searchValue.toLowerCase());
+      user.toLowerCase().includes(searchValue.toLowerCase()) ||
+      subject.toLowerCase().includes(searchValue.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
-  const handleViewClick = (ticket) => {
-    setSelectedTicket(ticket);
+  const handleViewClick = async (ticket) => {
+    try {
+      const response = await apiService.support.getById(ticket.id);
+      setSelectedTicket(response.data || ticket);
+    } catch (error) {
+      console.error('Error al obtener ticket:', error);
+      setSelectedTicket(ticket);
+    }
     setViewModalOpen(true);
   };
 
@@ -52,8 +108,16 @@ const ReportesSoporte = () => {
     setAssignModalOpen(true);
   };
 
-  const handleAssignSave = (ticketId, assignTo) => {
-    console.log(`Ticket ${ticketId} asignado a: ${assignTo}`);
+  const handleAssignSave = async (ticketId, assignTo) => {
+    try {
+      await apiService.support.assign(ticketId, assignTo);
+      setTickets(prev => prev.map(t =>
+        t.id === ticketId ? { ...t, asignadoA: assignTo } : t
+      ));
+      console.log(`Ticket ${ticketId} asignado a: ${assignTo}`);
+    } catch (error) {
+      console.error('Error al asignar ticket:', error);
+    }
     setAssignModalOpen(false);
     setSelectedTicket(null);
   };
@@ -77,21 +141,29 @@ const ReportesSoporte = () => {
         onCollapsedChange={setIsCollapsed}
       />
       <main className={`${styles.mainContent} ${isCollapsed ? styles.expanded : ''}`}>
-        <SupportKPIs data={kpiData} />
-        
-        <section className={styles.card}>
-          <SupportFilters
-            statusFilter={statusFilter}
-            searchValue={searchValue}
-            onStatusChange={setStatusFilter}
-            onSearchChange={setSearchValue}
-          />
-          <SupportTable 
-            tickets={filteredTickets}
-            onViewClick={handleViewClick}
-            onAssignClick={handleAssignClick}
-          />
-        </section>
+        {loading ? (
+          <div className={styles.loading}>
+            <p>Cargando datos de soporte...</p>
+          </div>
+        ) : (
+          <>
+            <SupportKPIs data={kpiData} />
+            
+            <section className={styles.card}>
+              <SupportFilters
+                statusFilter={statusFilter}
+                searchValue={searchValue}
+                onStatusChange={setStatusFilter}
+                onSearchChange={setSearchValue}
+              />
+              <SupportTable 
+                tickets={filteredTickets}
+                onViewClick={handleViewClick}
+                onAssignClick={handleAssignClick}
+              />
+            </section>
+          </>
+        )}
       </main>
 
       <AssignModal

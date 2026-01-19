@@ -126,10 +126,21 @@ function PlanAhorroModal({ isOpen, plan, onSave, onCancel, simboloMoneda }) {
       return;
     }
 
+    // Calcular montoAhorrarMensual si no está definido
+    let montoMensual = parseFloat(formData.montoAhorrarMensual);
+    if (isNaN(montoMensual) || montoMensual <= 0) {
+      const montoMeta = parseFloat(formData.montoMeta);
+      const fechaMeta = new Date(formData.fechaMeta);
+      const hoy = new Date();
+      const diasFaltantes = Math.ceil((fechaMeta - hoy) / (1000 * 60 * 60 * 24));
+      const mesesFaltantes = Math.max(1, Math.ceil(diasFaltantes / 30));
+      montoMensual = montoMeta / mesesFaltantes;
+    }
+
     const planData = {
       ...formData,
       montoMeta: parseFloat(formData.montoMeta),
-      montoAhorrarMensual: parseFloat(formData.montoAhorrarMensual),
+      montoAhorrarMensual: montoMensual,
       fechaMeta: new Date(formData.fechaMeta),
       icono: ICONOS_CATEGORIA[formData.categoria],
       color: COLORES_CATEGORIA[formData.categoria]

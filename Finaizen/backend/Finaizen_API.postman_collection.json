@@ -1,0 +1,358 @@
+{
+  "info": {
+    "name": "Finaizen API",
+    "description": "Colección completa de endpoints del API de Finaizen",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "perfilId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Juan\",\n  \"apellido\": \"Pérez\",\n  \"correo\": \"juan@example.com\",\n  \"nombreUsuario\": \"juanperez\",\n  \"contraseña\": \"password123\",\n  \"pais\": \"Ecuador\",\n  \"ciudad\": \"Quito\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"juan@example.com\",\n  \"contraseña\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Juan Carlos\",\n  \"ciudad\": \"Guayaquil\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contraseñaActual\": \"password123\",\n  \"contraseñaNueva\": \"newpassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/change-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "change-password"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Perfiles",
+      "item": [
+        {
+          "name": "Get All Perfiles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/perfiles",
+              "host": ["{{baseUrl}}"],
+              "path": ["perfiles"]
+            }
+          }
+        },
+        {
+          "name": "Create Perfil",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Personal\",\n  \"moneda\": \"USD\",\n  \"simboloMoneda\": \"$\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/perfiles",
+              "host": ["{{baseUrl}}"],
+              "path": ["perfiles"]
+            }
+          }
+        },
+        {
+          "name": "Get Resumen Financiero",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/perfiles/{{perfilId}}/resumen",
+              "host": ["{{baseUrl}}"],
+              "path": ["perfiles", "{{perfilId}}", "resumen"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ingresos",
+      "item": [
+        {
+          "name": "Get All Ingresos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/perfiles/{{perfilId}}/ingresos",
+              "host": ["{{baseUrl}}"],
+              "path": ["perfiles", "{{perfilId}}", "ingresos"]
+            }
+          }
+        },
+        {
+          "name": "Create Ingreso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"monto\": 1500.00,\n  \"descripcion\": \"Salario Mensual\",\n  \"categoria\": \"Salario\",\n  \"frecuencia\": \"mensual\",\n  \"diaMes\": 1,\n  \"notificacionActiva\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/perfiles/{{perfilId}}/ingresos",
+              "host": ["{{baseUrl}}"],
+              "path": ["perfiles", "{{perfilId}}", "ingresos"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Egresos",
+      "item": [
+        {
+          "name": "Get All Egresos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/perfiles/{{perfilId}}/egresos",
+              "host": ["{{baseUrl}}"],
+              "path": ["perfiles", "{{perfilId}}", "egresos"]
+            }
+          }
+        },
+        {
+          "name": "Create Egreso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"monto\": 50.00,\n  \"descripcion\": \"Supermercado\",\n  \"categoria\": \"Alimentación\",\n  \"frecuencia\": \"ocasional\",\n  \"fechaEspecifica\": \"2026-01-18\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/perfiles/{{perfilId}}/egresos",
+              "host": ["{{baseUrl}}"],
+              "path": ["perfiles", "{{perfilId}}", "egresos"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Presupuestos",
+      "item": [
+        {
+          "name": "Create Presupuesto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoria\": \"Alimentación\",\n  \"montoLimite\": 300.00,\n  \"periodo\": \"mensual\",\n  \"alertaEn\": 80,\n  \"mes\": 1,\n  \"anio\": 2026\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/perfiles/{{perfilId}}/presupuestos",
+              "host": ["{{baseUrl}}"],
+              "path": ["perfiles", "{{perfilId}}", "presupuestos"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Planes de Ahorro",
+      "item": [
+        {
+          "name": "Create Plan de Ahorro",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Vacaciones 2026\",\n  \"descripcion\": \"Viaje a la playa\",\n  \"objetivo\": \"Viajar en diciembre\",\n  \"montoMeta\": 2000.00,\n  \"montoAhorrarMensual\": 200.00,\n  \"categoria\": \"Viajes\",\n  \"fechaMeta\": \"2026-12-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/perfiles/{{perfilId}}/planes-ahorro",
+              "host": ["{{baseUrl}}"],
+              "path": ["perfiles", "{{perfilId}}", "planes-ahorro"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import mockDB from '../../../utils/mockDatabase';
+import apiService from '../../../services/apiService';
 import { Card, Button, Toast } from '../../../components/ui';
 import { ComprobanteModal } from '../../../components/modals';
 import { AchievementCard } from '../../../components/achievements';
@@ -45,28 +45,25 @@ function Logros() {
       return;
     }
 
-    // Verificar si los datos están actualizados
-    const version = localStorage.getItem('finaizen_db_version');
-    const expectedVersion = '2.0'; // Versión con logros de empresas
-    
-    if (version !== expectedVersion) {
-      console.log('🔄 Actualizando base de datos a versión', expectedVersion);
-      mockDB.clearLocalStorage();
-      localStorage.setItem('finaizen_db_version', expectedVersion);
-      window.location.reload();
-      return;
-    }
-
     cargarLogros();
   }, [currentUser, currentPerfil, authLoading, navigate]);
 
-  const cargarLogros = () => {
-    setLoading(true);
-    const logrosDelPerfil = mockDB.getLogrosDePerfil(currentPerfil.id);
-    console.log('📊 Logros cargados:', logrosDelPerfil.length);
-    console.log('🏢 Logros de empresas:', logrosDelPerfil.filter(l => l.empresa).length);
-    setLogros(logrosDelPerfil);
-    setLoading(false);
+  const cargarLogros = async () => {
+    try {
+      setLoading(true);
+      const logrosDelPerfil = await apiService.logros.getAll(currentPerfil.id);
+      console.log('📊 Logros cargados:', logrosDelPerfil.length);
+      console.log('🏢 Logros de empresas:', logrosDelPerfil.filter(l => l.empresa).length);
+      setLogros(logrosDelPerfil);
+    } catch (error) {
+      console.error('Error al cargar logros:', error);
+      setToast({
+        type: 'error',
+        message: 'Error al cargar los logros'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Filtrar logros según el filtro activo

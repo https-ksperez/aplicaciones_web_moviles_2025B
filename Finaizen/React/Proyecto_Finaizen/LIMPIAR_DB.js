@@ -19,3 +19,7 @@ console.log('%clocalStorage.removeItem("finaizen_mockdb"); location.reload();', 
 // Opción 2: Limpiar todo el localStorage
 localStorage.clear();
 location.reload();
+
+sessionStorage.clear();
+localStorage.clear();
+location.reload();

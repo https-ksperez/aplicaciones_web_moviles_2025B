@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import mockDB from '../../../utils/mockDatabase';
+import { useAuth } from '../../../context/AuthContext';
+import apiService from '../../../services/apiService';
 import Button from '../../ui/Button';
 import styles from './ModalDetallesDeuda.module.css';
 
@@ -8,26 +9,34 @@ import styles from './ModalDetallesDeuda.module.css';
  * ModalDetallesDeuda - Modal para ver detalles completos y gestionar una deuda
  */
 function ModalDetallesDeuda({ isOpen, plan, onClose, onPausar, onReactivar, onRefresh, simboloMoneda }) {
+  const { currentPerfil } = useAuth();
   const [modoPago, setModoPago] = useState(false);
   const [montoPago, setMontoPago] = useState('');
   const [descripcionPago, setDescripcionPago] = useState('');
 
   if (!isOpen || !plan) return null;
 
-  const handleAgregarPago = () => {
+  const handleAgregarPago = async () => {
     const monto = parseFloat(montoPago);
     if (monto <= 0) {
       alert('Ingresa un monto válido');
       return;
     }
 
-    const result = mockDB.agregarPagoPlan(plan.id, monto, descripcionPago);
-
-    if (result.success) {
+    try {
+      const nuevoMontoPagado = parseFloat(plan.montoPagado || 0) + monto;
+      await apiService.planesDeuda.update(currentPerfil.id, plan.id, {
+        montoPagado: nuevoMontoPagado,
+        estado: nuevoMontoPagado >= parseFloat(plan.montoTotal) ? 'completado' : plan.estado
+      });
+      
       setMontoPago('');
       setDescripcionPago('');
       setModoPago(false);
       onRefresh();
+    } catch (error) {
+      console.error('Error al agregar pago:', error);
+      alert('Error al agregar pago');
     }
   };
 
@@ -87,30 +96,30 @@ function ModalDetallesDeuda({ isOpen, plan, onClose, onPausar, onReactivar, onRe
             <div className={styles.datos}>
               <div className={styles.dato}>
                 <label>Deuda Total</label>
-                <p className={styles.valor}>{simboloMoneda}{plan.montoDeuda.toLocaleString()}</p>
+                <p className={styles.valor}>{simboloMoneda}{(plan.montoDeuda || 0).toLocaleString()}</p>
               </div>
               <div className={styles.dato}>
                 <label>Pagado</label>
-                <p className={styles.valor}>{simboloMoneda}{plan.montoPagado.toLocaleString()}</p>
+                <p className={styles.valor}>{simboloMoneda}{(plan.montoPagado || 0).toLocaleString()}</p>
               </div>
               <div className={styles.dato}>
                 <label>Faltante</label>
-                <p className={styles.valor}>{simboloMoneda}{plan.montoFaltante.toLocaleString()}</p>
+                <p className={styles.valor}>{simboloMoneda}{(plan.montoFaltante || 0).toLocaleString()}</p>
               </div>
               <div className={styles.dato}>
                 <label>Cuota Mensual</label>
-                <p className={styles.valor}>{simboloMoneda}{plan.cuotaMensual.toFixed(2)}</p>
+                <p className={styles.valor}>{simboloMoneda}{(plan.cuotaMensual || 0).toFixed(2)}</p>
               </div>
-              {plan.tasaInteres > 0 && (
+              {(plan.tasaInteres || 0) > 0 && (
                 <div className={styles.dato}>
                   <label>Tasa de Interés</label>
                   <p className={styles.valor}>{plan.tasaInteres}% anual</p>
                 </div>
               )}
-              {plan.interesGenerado > 0 && (
+              {(plan.interesGenerado || 0) > 0 && (
                 <div className={styles.dato}>
                   <label>Interés Generado</label>
-                  <p className={styles.valor}>{simboloMoneda}{plan.interesGenerado.toFixed(2)}</p>
+                  <p className={styles.valor}>{simboloMoneda}{(plan.interesGenerado || 0).toFixed(2)}</p>
                 </div>
               )}
             </div>
@@ -146,11 +155,11 @@ function ModalDetallesDeuda({ isOpen, plan, onClose, onPausar, onReactivar, onRe
           </div>
 
           {/* Historial de pagos */}
-          {plan.historialPagos.length > 0 && (
+          {(plan.historialPagos || []).length > 0 && (
             <div className={styles.seccion}>
               <h3 className={styles.seccionTitulo}>Historial de Pagos</h3>
               <div className={styles.historial}>
-                {plan.historialPagos.slice(-5).reverse().map((pago, idx) => (
+                {(plan.historialPagos || []).slice(-5).reverse().map((pago, idx) => (
                   <div
                     key={idx}
                     className={`${styles.movimiento} ${pago.monto > 0 ? styles.pago : styles.retiro}`}

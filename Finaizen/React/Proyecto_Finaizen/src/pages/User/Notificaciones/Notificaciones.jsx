@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import mockDB from '../../../utils/mockDatabase';
+import apiService from '../../../services/apiService';
 import { Card } from '../../../components/ui';
 import { NotificationCard, NotificationStats } from '../../../components/notifications';
 import styles from './Notificaciones.module.css';
@@ -21,43 +21,55 @@ export default function Notificaciones() {
     }
   }, [currentUser]);
 
-  const loadNotifications = () => {
+  const loadNotifications = async () => {
     if (!currentUser) return;
     
-    const notifs = mockDB.getNotificacionesDeUsuario(currentUser.id);
-    setNotifications(notifs);
-  };
-
-  const handleMarkAsRead = (notifId) => {
-    const notif = mockDB.notificaciones.find(n => n.id === notifId);
-    if (notif) {
-      notif.marcarComoLeida();
-      mockDB.saveToLocalStorage();
-      loadNotifications();
+    try {
+      const notifs = await apiService.notificaciones.getAll();
+      setNotifications(notifs);
+    } catch (error) {
+      console.error('Error al cargar notificaciones:', error);
     }
   };
 
-  const handleMarkAllAsRead = () => {
-    mockDB.notificaciones.forEach(n => {
-      if (n.userId === currentUser.id && !n.leida) {
-        n.marcarComoLeida();
-      }
-    });
-    mockDB.saveToLocalStorage();
-    loadNotifications();
+  const handleMarkAsRead = async (notifId) => {
+    try {
+      await apiService.notificaciones.markAsRead(notifId);
+      await loadNotifications();
+    } catch (error) {
+      console.error('Error al marcar como leída:', error);
+    }
   };
 
-  const handleDeleteNotification = (notifId) => {
-    mockDB.notificaciones = mockDB.notificaciones.filter(n => n.id !== notifId);
-    mockDB.saveToLocalStorage();
-    loadNotifications();
+  const handleMarkAllAsRead = async () => {
+    try {
+      await apiService.notificaciones.markAllAsRead();
+      await loadNotifications();
+    } catch (error) {
+      console.error('Error al marcar todas como leídas:', error);
+    }
   };
 
-  const handleDeleteAll = () => {
+  const handleDeleteNotification = async (notifId) => {
+    try {
+      await apiService.notificaciones.delete(notifId);
+      await loadNotifications();
+    } catch (error) {
+      console.error('Error al eliminar notificación:', error);
+    }
+  };
+
+  const handleDeleteAll = async () => {
     if (confirm('¿Estás seguro de eliminar TODAS las notificaciones?')) {
-      mockDB.notificaciones = mockDB.notificaciones.filter(n => n.userId !== currentUser.id);
-      mockDB.saveToLocalStorage();
-      loadNotifications();
+      try {
+        // Eliminar todas las notificaciones una por una
+        for (const notif of notifications) {
+          await apiService.notificaciones.delete(notif.id);
+        }
+        await loadNotifications();
+      } catch (error) {
+        console.error('Error al eliminar todas las notificaciones:', error);
+      }
     }
   };
 

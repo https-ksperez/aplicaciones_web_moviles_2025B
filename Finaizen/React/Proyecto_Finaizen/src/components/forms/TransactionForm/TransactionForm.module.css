@@ -448,6 +448,15 @@
   color: #ef4444;
 }
 
+/* Help Text */
+.helpText {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
 /* Form Actions */
 .formActions {
   display: flex;

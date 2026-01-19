@@ -8,19 +8,23 @@ import SupervisionCharts from '../../../components/supervision/SupervisionCharts
 import SupervisionFilters from '../../../components/supervision/SupervisionFilters';
 import SupervisionTable from '../../../components/supervision/SupervisionTable';
 import CorrectionModal from '../../../components/supervision/CorrectionModal';
-import { transactionsData, kpiData, chartData, categories } from '../../../utils/supervisionData';
+import apiService from '../../../services/apiService';
 import styles from './SupervisionCategorias.module.css';
 
 function SupervisionCategorias() {
   const { currentUser, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [loading, setLoading] = useState(true);
   
   // Estados
-  const [transactions, setTransactions] = useState(transactionsData);
-  const [filteredTransactions, setFilteredTransactions] = useState(transactionsData);
+  const [transactions, setTransactions] = useState([]);
+  const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [correctionModalOpen, setCorrectionModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [kpiData, setKpiData] = useState({ precision: 0, corrections: 0, problematicCategories: [] });
+  const [chartData, setChartData] = useState({ confidence: [], corrections: [] });
+  const [categories, setCategories] = useState([]);
   
   // Filtros
   const [confidenceFilter, setConfidenceFilter] = useState('todos');
@@ -49,19 +53,50 @@ function SupervisionCategorias() {
     }
   }, [currentUser, isAdmin, navigate]);
 
+  // Cargar datos del backend
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [transactionsRes, kpisRes] = await Promise.all([
+          apiService.supervision.getAll(),
+          apiService.supervision.getKPIs()
+        ]);
+        
+        setTransactions(transactionsRes.data || []);
+        setKpiData(kpisRes.data?.kpis || { precision: 0, corrections: 0, problematicCategories: [] });
+        setChartData(kpisRes.data?.charts || { confidence: [], corrections: [] });
+        setCategories(kpisRes.data?.categories || [
+          'Alimentación', 'Transporte', 'Entretenimiento', 'Salud', 
+          'Servicios', 'Educación', 'Hogar', 'Otros'
+        ]);
+      } catch (error) {
+        console.error('Error al cargar datos de supervisión:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (currentUser && isAdmin) {
+      loadData();
+    }
+  }, [currentUser, isAdmin]);
+
   // Aplicar filtros
   useEffect(() => {
     let filtered = [...transactions];
 
     // Filtrar por confianza
     if (confidenceFilter !== 'todos') {
-      filtered = filtered.filter(t => t.confidence === confidenceFilter);
+      filtered = filtered.filter(t => t.confianza === confidenceFilter || t.confidence === confidenceFilter);
     }
 
     // Filtrar por búsqueda
     if (searchTerm) {
+      const term = searchTerm.toLowerCase();
       filtered = filtered.filter(t =>
-        t.desc.toLowerCase().includes(searchTerm.toLowerCase())
+        (t.descripcion || t.desc || '').toLowerCase().includes(term) ||
+        (t.palabraClave || t.keyword || '').toLowerCase().includes(term)
       );
     }
 
@@ -69,10 +104,15 @@ function SupervisionCategorias() {
   }, [confidenceFilter, searchTerm, transactions]);
 
   // Handlers
-  const handleValidate = (transactionId) => {
-    setTransactions(prev => prev.map(t =>
-      t.id === transactionId ? { ...t, status: 'Validado' } : t
-    ));
+  const handleValidate = async (transactionId) => {
+    try {
+      await apiService.supervision.validate(transactionId);
+      setTransactions(prev => prev.map(t =>
+        t.id === transactionId ? { ...t, estado: 'Validado', status: 'Validado' } : t
+      ));
+    } catch (error) {
+      console.error('Error al validar:', error);
+    }
   };
 
   const handleCorrect = (transactionId) => {
@@ -81,15 +121,24 @@ function SupervisionCategorias() {
     setCorrectionModalOpen(true);
   };
 
-  const handleSaveCorrection = (transactionId, formData) => {
-    setTransactions(prev => prev.map(t =>
-      t.id === transactionId
-        ? { ...t, keyword: formData.keyword, category: formData.category, status: 'Validado' }
-        : t
-    ));
-    
-    if (formData.createRule) {
-      alert(`Regla creada: "${formData.keyword}" → "${formData.category}"`);
+  const handleSaveCorrection = async (transactionId, formData) => {
+    try {
+      await apiService.supervision.correct(transactionId, formData);
+      setTransactions(prev => prev.map(t =>
+        t.id === transactionId
+          ? { ...t, palabraClave: formData.keyword, categoriaDetectada: formData.category, estado: 'Validado', keyword: formData.keyword, category: formData.category, status: 'Validado' }
+          : t
+      ));
+      
+      if (formData.createRule) {
+        await apiService.supervision.createRule({ 
+          palabraClave: formData.keyword, 
+          categoria: formData.category 
+        });
+        alert(`Regla creada: "${formData.keyword}" → "${formData.category}"`);
+      }
+    } catch (error) {
+      console.error('Error al corregir:', error);
     }
   };
 
@@ -105,40 +154,48 @@ function SupervisionCategorias() {
       <main className={`${styles.mainContent} ${isCollapsed ? styles.expanded : ''}`}>
         <h1>Supervisión de Categorías</h1>
 
-        <SupervisionKPIs
-          precision={kpiData.precision}
-          corrections={kpiData.corrections}
-          problematicCategories={kpiData.problematicCategories}
-        />
+        {loading ? (
+          <div className={styles.loading}>
+            <p>Cargando datos de supervisión...</p>
+          </div>
+        ) : (
+          <>
+            <SupervisionKPIs
+              precision={kpiData.precision}
+              corrections={kpiData.corrections}
+              problematicCategories={kpiData.problematicCategories}
+            />
 
-        <AITestField />
+            <AITestField />
 
-        <SupervisionCharts
-          confidenceData={chartData.confidence}
-          correctionsData={chartData.corrections}
-          isCollapsed={isCollapsed}
-        />
+            <SupervisionCharts
+              confidenceData={chartData.confidence}
+              correctionsData={chartData.corrections}
+              isCollapsed={isCollapsed}
+            />
 
-        <section className={styles.tableSection}>
-          <SupervisionFilters
-            onConfidenceFilter={setConfidenceFilter}
-            onSearch={setSearchTerm}
-          />
+            <section className={styles.tableSection}>
+              <SupervisionFilters
+                onConfidenceFilter={setConfidenceFilter}
+                onSearch={setSearchTerm}
+              />
 
-          <SupervisionTable
-            transactions={filteredTransactions}
-            onValidate={handleValidate}
-            onCorrect={handleCorrect}
-          />
-        </section>
+              <SupervisionTable
+                transactions={filteredTransactions}
+                onValidate={handleValidate}
+                onCorrect={handleCorrect}
+              />
+            </section>
 
-        <CorrectionModal
-          isOpen={correctionModalOpen}
-          onClose={() => setCorrectionModalOpen(false)}
-          transaction={selectedTransaction}
-          categories={categories}
-          onSave={handleSaveCorrection}
-        />
+            <CorrectionModal
+              isOpen={correctionModalOpen}
+              onClose={() => setCorrectionModalOpen(false)}
+              transaction={selectedTransaction}
+              categories={categories}
+              onSave={handleSaveCorrection}
+            />
+          </>
+        )}
       </main>
     </div>
   );

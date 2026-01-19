@@ -28,7 +28,7 @@ const ProfileCard = ({ perfil, isActive, onSwitch, onEdit, onDelete }) => {
           </div>
           <div className={styles.profileCurrency}>
             <span>Moneda</span>
-            <strong>{perfil.moneda}</strong>
+            <strong>{typeof perfil.moneda === 'object' ? perfil.moneda.codigo : perfil.moneda}</strong>
           </div>
         </div>
         <div className={styles.profileCardActions}>

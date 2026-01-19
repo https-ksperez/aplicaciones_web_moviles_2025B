@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
-import mockDB, { EventTypes, EventCategories, SeverityLevels, EventStatus } from '../../../../utils/mockDatabase';
+import apiService from '../../../../services/apiService';
 import { Card, Button, Input, Select, Toast } from '../../../../components/ui';
 import styles from './ConfigCuenta.module.css';
 
@@ -73,74 +73,22 @@ const ConfigCuenta = () => {
       // Verificar si el email cambió
       const emailChanged = formData.email !== originalEmail;
 
-      // Si el email cambió, verificar que no esté en uso
-      if (emailChanged) {
-        const existingUser = mockDB.users.find(
-          u => u.correo === formData.email && u.id !== currentUser.id
-        );
-        if (existingUser) {
-          showToast('El email ya está en uso por otra cuenta', 'error');
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      // Obtener el usuario actual desde mockDB (instancia de User)
-      const userFromDB = mockDB.users.find(u => u.id === currentUser.id);
-      
-      if (!userFromDB) {
-        showToast('Usuario no encontrado', 'error');
-        setIsLoading(false);
-        return;
-      }
-
-      // Actualizar propiedades directamente en la instancia de User
-      userFromDB.nombre = formData.nombre;
-      userFromDB.apellido = formData.apellido;
-      userFromDB.correo = formData.email;
-      userFromDB.fechaNacimiento = formData.fechaNacimiento ? new Date(formData.fechaNacimiento) : userFromDB.fechaNacimiento;
-      userFromDB.pais = formData.pais;
-      userFromDB.ciudad = formData.ciudad;
-      userFromDB.genero = formData.genero;
-      userFromDB.updatedAt = new Date();
-      
-      // Guardar en localStorage
-      mockDB.saveToLocalStorage();
-
-      // Actualizar contexto con la instancia actualizada
-      updateUser(userFromDB);
-
-      // Crear log de cambio de perfil
-      mockDB.createSecurityLog({
-        userId: currentUser.id,
-        userEmail: formData.email,
-        eventType: EventTypes.PROFILE_UPDATED,
-        eventCategory: EventCategories.CONFIGURACION,
-        description: 'Información de cuenta actualizada',
-        status: EventStatus.SUCCESS,
-        severity: SeverityLevels.LOW,
-        metadata: {
-          fieldsChanged: Object.keys(formData).filter(
-            key => formData[key] !== currentUser[key]
-          )
-        }
+      // Actualizar usuario mediante el API
+      const updatedUser = await apiService.users.update(currentUser.id, {
+        nombre: formData.nombre,
+        apellido: formData.apellido,
+        correo: formData.email,
+        fechaNacimiento: formData.fechaNacimiento || null,
+        pais: formData.pais,
+        ciudad: formData.ciudad,
+        genero: formData.genero
       });
 
-      // Si el email cambió, crear log adicional
+      // Actualizar contexto con el usuario actualizado
+      updateUser(updatedUser);
+
+      // Si el email cambió, actualizar la referencia
       if (emailChanged) {
-        mockDB.createSecurityLog({
-          userId: currentUser.id,
-          userEmail: formData.email,
-          eventType: EventTypes.EMAIL_CHANGED,
-          eventCategory: EventCategories.CONFIGURACION,
-          description: `Email cambiado de ${originalEmail} a ${formData.email}`,
-          status: EventStatus.SUCCESS,
-          severity: SeverityLevels.MEDIUM,
-          metadata: {
-            oldEmail: originalEmail,
-            newEmail: formData.email
-          }
-        });
         setOriginalEmail(formData.email);
       }
 

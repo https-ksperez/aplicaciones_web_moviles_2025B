@@ -40,7 +40,7 @@ function FloatingActionButton({
   const fabClasses = [
     styles.fab,
     styles[color],
-    currentUser?.premiumActivo ? styles.premium : '',
+    currentUser?.isPremium ? styles.premium : '',
     isOpen ? styles.open : ''
   ].filter(Boolean).join(' ');
 

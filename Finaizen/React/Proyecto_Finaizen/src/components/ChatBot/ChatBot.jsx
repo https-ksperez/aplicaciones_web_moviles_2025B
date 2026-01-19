@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import mockDB from '../../utils/mockDatabase';
+import apiService from '../../services/apiService';
 import styles from './ChatBot.module.css';
 
 /**
@@ -15,7 +15,30 @@ export default function ChatBot({ isOpen, onClose }) {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [financialData, setFinancialData] = useState(null);
   const messagesEndRef = useRef(null);
+
+  // Cargar datos financieros del backend
+  useEffect(() => {
+    const loadFinancialData = async () => {
+      if (isOpen && currentPerfil) {
+        try {
+          const [historial, logros] = await Promise.all([
+            apiService.historial.getAll(currentPerfil.id),
+            apiService.logros.getAll(currentPerfil.id)
+          ]);
+          
+          const ingresos = historial.filter(h => h.tipo === 'ingreso');
+          const egresos = historial.filter(h => h.tipo === 'egreso');
+          
+          setFinancialData({ ingresos, egresos, logros });
+        } catch (error) {
+          console.error('Error cargando datos financieros:', error);
+        }
+      }
+    };
+    loadFinancialData();
+  }, [isOpen, currentPerfil]);
 
   // Cargar historial de mensajes del localStorage
   useEffect(() => {
@@ -95,13 +118,16 @@ export default function ChatBot({ isOpen, onClose }) {
   const generateBotResponse = (userInput) => {
     const input = userInput.toLowerCase();
     
-    // Análisis financiero
-    const ingresos = mockDB.getIngresosDePerf(currentPerfil.id);
-    const egresos = mockDB.getEgresosDePerf(currentPerfil.id);
-    const logros = mockDB.getLogrosDePerfil(currentPerfil.id);
+    // Símbolo de moneda del perfil
+    const simboloMoneda = currentPerfil?.moneda?.simbolo || '$';
     
-    const totalIngresos = ingresos.reduce((sum, ing) => sum + ing.monto, 0);
-    const totalEgresos = egresos.reduce((sum, eg) => sum + eg.monto, 0);
+    // Usar datos precargados
+    const ingresos = financialData?.ingresos || [];
+    const egresos = financialData?.egresos || [];
+    const logros = financialData?.logros || [];
+    
+    const totalIngresos = ingresos.reduce((sum, ing) => sum + parseFloat(ing.monto || 0), 0);
+    const totalEgresos = egresos.reduce((sum, eg) => sum + parseFloat(eg.monto || 0), 0);
     const balance = totalIngresos - totalEgresos;
     
     // Análisis por categorías
@@ -221,12 +247,12 @@ Te llevaré de regreso al dashboard donde verás:
       return `📊 **Análisis Financiero Actual:**
 
 💰 **Balance General:**
-• Ingresos totales: ${currentPerfil.simboloMoneda}${totalIngresos.toFixed(2)}
-• Egresos totales: ${currentPerfil.simboloMoneda}${totalEgresos.toFixed(2)}
-• Balance: ${currentPerfil.simboloMoneda}${balance.toFixed(2)} ${balance >= 0 ? '✅' : '⚠️'}
+• Ingresos totales: ${simboloMoneda}${totalIngresos.toFixed(2)}
+• Egresos totales: ${simboloMoneda}${totalEgresos.toFixed(2)}
+• Balance: ${simboloMoneda}${balance.toFixed(2)} ${balance >= 0 ? '✅' : '⚠️'}
 
 📈 **Categoría con más gastos:**
-${categoriaConMasGastos ? `${categoriaConMasGastos[0]}: ${currentPerfil.simboloMoneda}${categoriaConMasGastos[1].toFixed(2)}` : 'N/A'}
+${categoriaConMasGastos ? `${categoriaConMasGastos[0]}: ${simboloMoneda}${categoriaConMasGastos[1].toFixed(2)}` : 'N/A'}
 
 ${balance < 0 ? '⚠️ **Alerta:** Tus gastos superan tus ingresos. Te recomiendo revisar gastos en ' + (categoriaConMasGastos ? categoriaConMasGastos[0] : 'varias categorías') + '.' : '✅ **Excelente:** Estás manteniendo un balance positivo. ¡Sigue así!'}`;
     }
@@ -235,15 +261,15 @@ ${balance < 0 ? '⚠️ **Alerta:** Tus gastos superan tus ingresos. Te recomien
       const potencialAhorro = totalIngresos * 0.2;
       return `💡 **Estrategia de Ahorro Personalizada:**
 
-Basándome en tus ingresos de ${currentPerfil.simboloMoneda}${totalIngresos.toFixed(2)}, te recomiendo:
+Basándome en tus ingresos de ${simboloMoneda}${totalIngresos.toFixed(2)}, te recomiendo:
 
-🎯 **Meta de ahorro mensual:** ${currentPerfil.simboloMoneda}${potencialAhorro.toFixed(2)} (20% de tus ingresos)
+🎯 **Meta de ahorro mensual:** ${simboloMoneda}${potencialAhorro.toFixed(2)} (20% de tus ingresos)
 
 📝 **Recomendaciones:**
 1. Automatiza transferencias a una cuenta de ahorros
 2. Usa la regla 50/30/20: 50% necesidades, 30% gustos, 20% ahorros
 3. Revisa suscripciones que no uses frecuentemente
-${categoriaConMasGastos ? `4. Reduce gastos en ${categoriaConMasGastos[0]} (actualmente: ${currentPerfil.simboloMoneda}${categoriaConMasGastos[1].toFixed(2)})` : ''}
+${categoriaConMasGastos ? `4. Reduce gastos en ${categoriaConMasGastos[0]} (actualmente: ${simboloMoneda}${categoriaConMasGastos[1].toFixed(2)})` : ''}
 
 ¿Quieres que te ayude a crear un plan de ahorro específico?`;
     }
@@ -254,10 +280,10 @@ ${categoriaConMasGastos ? `4. Reduce gastos en ${categoriaConMasGastos[0]} (actu
       return `📊 **Análisis de Gastos:**
 
 Total de egresos registrados: ${egresos.length}
-Gasto promedio: ${currentPerfil.simboloMoneda}${(totalEgresos / egresos.length).toFixed(2)}
+Gasto promedio: ${simboloMoneda}${(totalEgresos / egresos.length).toFixed(2)}
 
 ${gastosAltos.length > 0 ? `⚠️ **Gastos superiores al promedio:**
-${gastosAltos.slice(0, 3).map(e => `• ${e.descripcion || e.categoria}: ${currentPerfil.simboloMoneda}${e.monto.toFixed(2)}`).join('\n')}
+${gastosAltos.slice(0, 3).map(e => `• ${e.descripcion || e.categoria}: ${simboloMoneda}${e.monto.toFixed(2)}`).join('\n')}
 
 Estos gastos están por encima del promedio. ¿Son necesarios o podrías reducirlos?` : '✅ Tus gastos están bien distribuidos.'}
 
@@ -270,13 +296,13 @@ ${categoriaConMasGastos ? `\n🔍 **Categoría dominante:** ${categoriaConMasGas
       
       return `💰 **Análisis de Ingresos:**
 
-📈 **Total:** ${currentPerfil.simboloMoneda}${totalIngresos.toFixed(2)}
+📈 **Total:** ${simboloMoneda}${totalIngresos.toFixed(2)}
 
 🔄 **Ingresos recurrentes:** ${ingresosRecurrentes.length}
-${ingresosRecurrentes.slice(0, 3).map(i => `• ${i.fuente}: ${currentPerfil.simboloMoneda}${i.monto.toFixed(2)}`).join('\n')}
+${ingresosRecurrentes.slice(0, 3).map(i => `• ${i.fuente}: ${simboloMoneda}${i.monto.toFixed(2)}`).join('\n')}
 
 💵 **Ingresos ocasionales:** ${ingresosOcasionales.length}
-${ingresosOcasionales.length > 0 ? ingresosOcasionales.slice(0, 2).map(i => `• ${i.fuente}: ${currentPerfil.simboloMoneda}${i.monto.toFixed(2)}`).join('\n') : 'Ninguno registrado'}
+${ingresosOcasionales.length > 0 ? ingresosOcasionales.slice(0, 2).map(i => `• ${i.fuente}: ${simboloMoneda}${i.monto.toFixed(2)}`).join('\n') : 'Ninguno registrado'}
 
 💡 **Recomendación:** ${ingresosRecurrentes.length > 0 ? 'Excelente, tienes ingresos estables. Considera invertir una parte.' : 'Intenta crear fuentes de ingreso recurrentes para mayor estabilidad financiera.'}`;
     }
@@ -284,15 +310,15 @@ ${ingresosOcasionales.length > 0 ? ingresosOcasionales.slice(0, 2).map(i => `•
     if (input.includes('presupuesto') || input.includes('plan')) {
       return `📋 **Plan de Presupuesto Inteligente:**
 
-Basado en tus ingresos de ${currentPerfil.simboloMoneda}${totalIngresos.toFixed(2)}:
+Basado en tus ingresos de ${simboloMoneda}${totalIngresos.toFixed(2)}:
 
-🏠 **Necesidades (50%):** ${currentPerfil.simboloMoneda}${(totalIngresos * 0.5).toFixed(2)}
+🏠 **Necesidades (50%):** ${simboloMoneda}${(totalIngresos * 0.5).toFixed(2)}
 • Vivienda, alimentación, transporte, servicios básicos
 
-🎨 **Gustos (30%):** ${currentPerfil.simboloMoneda}${(totalIngresos * 0.3).toFixed(2)}
+🎨 **Gustos (30%):** ${simboloMoneda}${(totalIngresos * 0.3).toFixed(2)}
 • Entretenimiento, restaurantes, hobbies
 
-💎 **Ahorros/Inversiones (20%):** ${currentPerfil.simboloMoneda}${(totalIngresos * 0.2).toFixed(2)}
+💎 **Ahorros/Inversiones (20%):** ${simboloMoneda}${(totalIngresos * 0.2).toFixed(2)}
 • Fondo de emergencia, inversiones, metas futuras
 
 ${totalEgresos > totalIngresos * 0.8 ? '⚠️ Estás gastando más del 80% de tus ingresos. Ajusta gastos en categorías no esenciales.' : '✅ Tu nivel de gasto está dentro del rango saludable.'}
@@ -316,7 +342,7 @@ ${totalEgresos > totalIngresos * 0.8 ? '⚠️ Estás gastando más del 80% de t
    Para compras >$50, espera 24 horas antes de decidir.
 
 ${categoriaConMasGastos ? `\n5️⃣ **Enfócate en ${categoriaConMasGastos[0]}:**
-   Está consumiendo ${currentPerfil.simboloMoneda}${categoriaConMasGastos[1].toFixed(2)} de tu presupuesto. Reduce un 20% aquí para ahorrar ${currentPerfil.simboloMoneda}${(categoriaConMasGastos[1] * 0.2).toFixed(2)} al mes.` : ''}
+   Está consumiendo ${simboloMoneda}${categoriaConMasGastos[1].toFixed(2)} de tu presupuesto. Reduce un 20% aquí para ahorrar ${simboloMoneda}${(categoriaConMasGastos[1] * 0.2).toFixed(2)} al mes.` : ''}
 
 ¿Quieres tips específicos para alguna categoría?`;
     }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
 import { Card, Button, Input, Textarea, Toast } from '../../../../components/ui';
+import apiService from '../../../../services/apiService';
 import styles from './ConfigAyuda.module.css';
 
 /**
@@ -50,30 +51,15 @@ const ConfigAyuda = () => {
     setIsSubmitting(true);
 
     try {
-      // Simular envío (en producción sería una llamada a la API)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // TODO: En producción, enviar a la API
-      // const response = await fetch('/api/support/tickets', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     userId: currentUser.id,
-      //     perfilId: currentPerfil.id,
-      //     asunto: formData.asunto,
-      //     descripcion: formData.problema,
-      //     timestamp: new Date().toISOString()
-      //   })
-      // });
-
-      console.log('Ticket de soporte enviado:', {
-        usuario: currentUser.nombreCompleto,
-        email: currentUser.correo,
-        perfil: currentPerfil.nombre,
+      // Enviar ticket a la API
+      const response = await apiService.support.createUserTicket({
+        emailUsuario: currentUser?.correo,
         asunto: formData.asunto,
-        problema: formData.problema,
-        fecha: new Date().toISOString()
+        descripcion: formData.problema,
+        prioridad: 'media'
       });
+
+      console.log('Ticket de soporte enviado:', response);
 
       showToast('✅ Ticket enviado correctamente. Te contactaremos pronto.', 'success');
       

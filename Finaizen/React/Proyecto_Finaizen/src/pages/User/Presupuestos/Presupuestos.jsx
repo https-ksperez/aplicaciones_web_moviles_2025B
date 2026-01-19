@@ -6,7 +6,7 @@ import PresupuestoCard from '../../../components/ui/PresupuestoCard';
 import BudgetModal from '../../../components/modals/BudgetModal';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import Button from '../../../components/ui/Button';
-import mockDB from '../../../utils/mockDatabase';
+import apiService from '../../../services/apiService';
 import styles from './Presupuestos.module.css';
 
 /**
@@ -23,59 +23,70 @@ export default function Presupuestos() {
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [filtro, setFiltro] = useState('todos'); // 'todos', 'mensual', 'semanal', 'anual'
 
-  const cargarPresupuestos = useCallback(() => {
+  const cargarPresupuestos = useCallback(async () => {
     if (!currentPerfil) return;
 
-    const todosPresupuestos = mockDB.presupuestos;
-    const historial = mockDB.historial;
+    try {
+      const [todosPresupuestos, historial] = await Promise.all([
+        apiService.presupuestos.getAll(currentPerfil.id),
+        apiService.historial.getAll(currentPerfil.id)
+      ]);
 
-    // Filtrar presupuestos del perfil actual y del mes/año actual
-    const fecha = new Date();
-    const mesActual = fecha.getMonth() + 1;
-    const anioActual = fecha.getFullYear();
+      // Filtrar presupuestos del perfil actual y del mes/año actual
+      const fecha = new Date();
+      const mesActual = fecha.getMonth() + 1;
+      const anioActual = fecha.getFullYear();
 
-    const presupuestosPerfil = todosPresupuestos.filter(
-      p => p.perfilId === currentPerfil.id && 
-           p.mes === mesActual && 
-           p.anio === anioActual &&
-           p.activo
-    );
-
-    // Calcular el gasto real de cada presupuesto basado en el historial del mes actual
-    const presupuestosConGastoReal = presupuestosPerfil.map(presupuesto => {
-      const gastosCategoria = historial.filter(h =>
-        h.perfilId === currentPerfil.id &&
-        h.tipo === 'egreso' &&
-        h.categoria === presupuesto.categoria &&
-        h.mes === mesActual &&
-        h.anio === anioActual
+      const presupuestosPerfil = todosPresupuestos.filter(
+        p => p.mes === mesActual && 
+             p.anio === anioActual &&
+             p.activo
       );
 
-      const montoGastadoReal = gastosCategoria.reduce((sum, h) => sum + h.monto, 0);
-      const porcentajeGastado = presupuesto.montoLimite > 0 
-        ? Math.round((montoGastadoReal / presupuesto.montoLimite) * 100)
-        : 0;
+      // Calcular el gasto real de cada presupuesto basado en el historial del mes actual
+      const presupuestosConGastoReal = presupuestosPerfil.map(presupuesto => {
+        const gastosCategoria = historial.filter(h =>
+          h.tipo === 'egreso' &&
+          h.categoria === presupuesto.categoria &&
+          h.mes === mesActual &&
+          h.anio === anioActual
+        );
 
-      let estado;
-      if (porcentajeGastado >= 100) {
-        estado = 'danger';
-      } else if (porcentajeGastado >= presupuesto.alertaEn) {
-        estado = 'warning';
-      } else if (porcentajeGastado >= 50) {
-        estado = 'neutral';
-      } else {
-        estado = 'ok';
-      }
+        const montoGastadoReal = gastosCategoria.reduce((sum, h) => sum + parseFloat(h.monto || 0), 0);
+        const montoLimite = parseFloat(presupuesto.montoLimite || 0);
+        const porcentajeGastado = montoLimite > 0 
+          ? Math.round((montoGastadoReal / montoLimite) * 100)
+          : 0;
 
-      return {
-        ...presupuesto,
-        montoGastado: montoGastadoReal,
-        porcentajeGastado,
-        estado
-      };
-    });
+        let estado;
+        if (porcentajeGastado >= 100) {
+          estado = 'danger';
+        } else if (porcentajeGastado >= presupuesto.alertaEn) {
+          estado = 'warning';
+        } else if (porcentajeGastado >= 50) {
+          estado = 'neutral';
+        } else {
+          estado = 'ok';
+        }
 
-    setPresupuestos(presupuestosConGastoReal);
+        return {
+          ...presupuesto,
+          montoLimite,
+          montoGastado: montoGastadoReal,
+          porcentajeGastado,
+          estado
+        };
+      });
+
+      setPresupuestos(presupuestosConGastoReal);
+    } catch (error) {
+      console.error('Error al cargar presupuestos:', error);
+      setToast({
+        show: true,
+        message: 'Error al cargar presupuestos',
+        type: 'error'
+      });
+    }
   }, [currentPerfil]);
 
   useEffect(() => {
@@ -109,73 +120,74 @@ export default function Presupuestos() {
     setDeletingPresupuesto(presupuesto);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deletingPresupuesto) return;
 
-    // Marcar como inactivo en lugar de eliminar
-    const index = mockDB.presupuestos.findIndex(p => p.id === deletingPresupuesto.id);
-    if (index !== -1) {
-      mockDB.presupuestos[index].activo = false;
-      cargarPresupuestos();
+    try {
+      // Marcar como inactivo en lugar de eliminar
+      await apiService.presupuestos.update(currentPerfil.id, deletingPresupuesto.id, { activo: false });
+      await cargarPresupuestos();
       showToast('Presupuesto eliminado correctamente', 'success');
+    } catch (error) {
+      console.error('Error al eliminar presupuesto:', error);
+      showToast('Error al eliminar presupuesto', 'error');
     }
 
     setDeletingPresupuesto(null);
   };
 
-  const handleSave = (budgetData) => {
+  const handleSave = async (budgetData) => {
     const fecha = new Date();
     const mesActual = fecha.getMonth() + 1;
     const anioActual = fecha.getFullYear();
 
-    if (editingPresupuesto) {
-      // Modo edición
-      const index = mockDB.presupuestos.findIndex(p => p.id === editingPresupuesto.id);
-      if (index !== -1) {
-        mockDB.presupuestos[index] = {
-          ...mockDB.presupuestos[index],
+    try {
+      if (editingPresupuesto) {
+        // Modo edición
+        await apiService.presupuestos.update(currentPerfil.id, editingPresupuesto.id, {
           ...budgetData,
           fechaModificacion: new Date().toISOString()
-        };
-        cargarPresupuestos();
+        });
+        await cargarPresupuestos();
         showToast('Presupuesto actualizado correctamente', 'success');
+      } else {
+        // Modo creación
+        // Verificar si ya existe un presupuesto activo para esta categoría en este mes
+        const presupuestosExistentes = await apiService.presupuestos.getAll(currentPerfil.id);
+        const existente = presupuestosExistentes.find(
+          p => p.categoria === budgetData.categoria &&
+               p.mes === mesActual &&
+               p.anio === anioActual &&
+               p.activo
+        );
+
+        if (existente) {
+          showToast(`Ya existe un presupuesto activo para la categoría "${budgetData.categoria}" este mes`, 'error');
+          return;
+        }
+
+        const nuevoPresupuesto = {
+          ...budgetData,
+          mes: mesActual,
+          anio: anioActual,
+          montoGastado: 0,
+          porcentajeGastado: 0,
+          estado: 'ok',
+          activo: true,
+          fechaCreacion: new Date().toISOString()
+        };
+
+        await apiService.presupuestos.create(currentPerfil.id, nuevoPresupuesto);
+        await cargarPresupuestos();
+        showToast('Presupuesto creado correctamente', 'success');
       }
-    } else {
-      // Modo creación
-      // Verificar si ya existe un presupuesto activo para esta categoría en este mes
-      const existente = mockDB.presupuestos.find(
-        p => p.perfilId === currentPerfil.id &&
-             p.categoria === budgetData.categoria &&
-             p.mes === mesActual &&
-             p.anio === anioActual &&
-             p.activo
-      );
 
-      if (existente) {
-        showToast(`Ya existe un presupuesto activo para la categoría "${budgetData.categoria}" este mes`, 'error');
-        return;
-      }
-
-      const nuevoPresupuesto = {
-        id: Date.now(),
-        perfilId: currentPerfil.id,
-        ...budgetData,
-        mes: mesActual,
-        anio: anioActual,
-        montoGastado: 0,
-        porcentajeGastado: 0,
-        estado: 'ok',
-        activo: true,
-        fechaCreacion: new Date().toISOString()
-      };
-
-      mockDB.presupuestos.push(nuevoPresupuesto);
-      cargarPresupuestos();
-      showToast('Presupuesto creado correctamente', 'success');
+      setShowModal(false);
+      setEditingPresupuesto(null);
+    } catch (error) {
+      console.error('Error al guardar presupuesto:', error);
+      showToast('Error al guardar presupuesto', 'error');
     }
-
-    setShowModal(false);
-    setEditingPresupuesto(null);
   };
 
   const handleCloseModal = () => {
@@ -253,7 +265,7 @@ export default function Presupuestos() {
                 <PresupuestoCard
                   key={presupuesto.id}
                   presupuesto={presupuesto}
-                  simboloMoneda={currentPerfil.simboloMoneda}
+                  simboloMoneda={currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$'}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   showActions={true}
@@ -270,7 +282,7 @@ export default function Presupuestos() {
           presupuesto={editingPresupuesto}
           onSave={handleSave}
           onCancel={handleCloseModal}
-          simboloMoneda={currentPerfil?.simboloMoneda || '$'}
+          simboloMoneda={currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$'}
         />
 
         {/* Diálogo de confirmación para eliminar */}

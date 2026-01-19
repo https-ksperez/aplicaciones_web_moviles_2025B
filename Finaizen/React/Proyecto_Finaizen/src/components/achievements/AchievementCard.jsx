@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Button } from '../ui';
 import styles from './AchievementCard.module.css';
@@ -9,6 +10,22 @@ import styles from './AchievementCard.module.css';
 function AchievementCard({ logro, onAction }) {
   const isCompleted = logro.desbloqueado;
   const progress = logro.porcentajeProgreso || 0;
+  const [imageError, setImageError] = useState(false);
+
+  // Función para obtener un emoji representativo de la empresa
+  const getEmpresaEmoji = (empresa) => {
+    const emojis = {
+      'Starbucks': '☕',
+      'McDonald\'s': '🍔',
+      'Cinemark': '🎬',
+      'Amazon': '📦',
+      'Liverpool': '🛍️',
+      'Spotify': '🎵',
+      'Netflix': '🎬',
+      'Uber': '🚗',
+    };
+    return emojis[empresa] || logro.icono || '🏆';
+  };
 
   return (
     <article 
@@ -18,22 +35,23 @@ function AchievementCard({ logro, onAction }) {
       {isCompleted && <div className={styles.badge}>Completado</div>}
       
       <div className={styles.achievementCardHeader}>
-        {/* Mostrar logo de empresa si existe, sino el icono del logro */}
-        {logro.logoEmpresa ? (
+        {/* Mostrar logo de empresa si existe y no hay error, sino mostrar emoji */}
+        {logro.logoEmpresa && !imageError ? (
           <img 
             src={logro.logoEmpresa} 
             alt={logro.empresa || 'Logo'} 
             className={styles.companyLogo}
+            onError={() => setImageError(true)}
           />
         ) : (
           <div className={styles.achievementIcon}>
-            {logro.icono}
+            {logro.empresa ? getEmpresaEmoji(logro.empresa) : logro.icono}
           </div>
         )}
-        <h3>{logro.nombre}</h3>
         {logro.empresa && (
-          <span className={styles.empresaBadge}>{logro.empresa}</span>
+          <span className={styles.empresaName}>{logro.empresa}</span>
         )}
+        <h3>{logro.nombre}</h3>
       </div>
 
       <div className={styles.achievementCardBody}>

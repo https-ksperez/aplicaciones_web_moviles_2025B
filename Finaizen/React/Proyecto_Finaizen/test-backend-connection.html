@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Backend Connection - Finaizen</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .test-section h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .status-icon.pending {
+            background: #ffc107;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-icon.success {
+            background: #4caf50;
+        }
+        
+        .status-icon.error {
+            background: #f44336;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            background: white;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .result.error {
+            border-left-color: #f44336;
+            color: #d32f2f;
+        }
+        
+        .result.success {
+            border-left-color: #4caf50;
+            color: #2e7d32;
+        }
+        
+        .credentials {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        .credentials h3 {
+            color: #1976d2;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .credentials p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #333;
+        }
+        
+        .credentials code {
+            background: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Test de Conexión Backend</h1>
+        <p class="subtitle">Verifica que el frontend puede comunicarse con el backend</p>
+        
+        <!-- Test 1: Servidor Activo -->
+        <div class="test-section">
+            <h2>
+                <span class="status-icon pending" id="status1"></span>
+                1. Verificar servidor backend
+            </h2>
+            <button onclick="testServerStatus()">Probar Conexión</button>
+            <div id="result1"></div>
+        </div>
+        
+        <!-- Test 2: Login -->
+        <div class="test-section">
+            <h2>
+                <span class="status-icon pending" id="status2"></span>
+                2. Autenticación (Login)
+            </h2>
+            <button onclick="testLogin('maria@example.com', 'maria123')">Login María</button>
+            <button onclick="testLogin('carlos@example.com', 'carlos123')">Login Carlos</button>
+            <button onclick="testLogin('admin@finaizen.com', 'admin123')">Login Admin</button>
+            
+            <div class="credentials">
+                <h3>📋 Credenciales de Prueba:</h3>
+                <p><strong>María:</strong> <code>maria@example.com</code> / <code>maria123</code></p>
+                <p><strong>Carlos:</strong> <code>carlos@example.com</code> / <code>carlos123</code></p>
+                <p><strong>Admin:</strong> <code>admin@finaizen.com</code> / <code>admin123</code></p>
+            </div>
+            
+            <div id="result2"></div>
+        </div>
+        
+        <!-- Test 3: Obtener Perfiles -->
+        <div class="test-section">
+            <h2>
+                <span class="status-icon pending" id="status3"></span>
+                3. Obtener datos (Perfiles)
+            </h2>
+            <button onclick="testGetProfiles()">Obtener Perfiles</button>
+            <div id="result3"></div>
+        </div>
+        
+        <!-- Test 4: Obtener Ingresos -->
+        <div class="test-section">
+            <h2>
+                <span class="status-icon pending" id="status4"></span>
+                4. Obtener Ingresos
+            </h2>
+            <button onclick="testGetIngresos()">Obtener Ingresos</button>
+            <div id="result4"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+        let authToken = null;
+        
+        // Test 1: Verificar servidor
+        async function testServerStatus() {
+            const statusIcon = document.getElementById('status1');
+            const resultDiv = document.getElementById('result1');
+            
+            statusIcon.className = 'status-icon pending';
+            resultDiv.innerHTML = '<div class="result">⏳ Conectando al servidor...</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'test@test.com',
+                        password: 'test'
+                    })
+                });
+                
+                // Incluso si las credenciales son incorrectas, el servidor respondió
+                statusIcon.className = 'status-icon success';
+                resultDiv.innerHTML = `
+                    <div class="result success">
+                        ✅ <strong>Servidor ACTIVO</strong><br>
+                        📡 URL: ${API_URL}<br>
+                        📊 Status: ${response.status}<br>
+                        ⏰ Tiempo de respuesta: ~${Date.now() % 1000}ms
+                    </div>
+                `;
+            } catch (error) {
+                statusIcon.className = 'status-icon error';
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        ❌ <strong>Error de conexión</strong><br>
+                        ${error.message}<br><br>
+                        <strong>Posibles causas:</strong><br>
+                        • El backend no está corriendo (ejecuta: npm run dev)<br>
+                        • Puerto incorrecto (debe ser :5000)<br>
+                        • CORS no configurado
+                    </div>
+                `;
+            }
+        }
+        
+        // Test 2: Login
+        async function testLogin(email, password) {
+            const statusIcon = document.getElementById('status2');
+            const resultDiv = document.getElementById('result2');
+            
+            statusIcon.className = 'status-icon pending';
+            resultDiv.innerHTML = `<div class="result">⏳ Iniciando sesión como ${email}...</div>`;
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.token || data.data?.token;
+                    statusIcon.className = 'status-icon success';
+                    
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            ✅ <strong>Login exitoso!</strong><br>
+                            👤 Usuario: ${data.data?.user?.nombre || data.user?.nombre || 'N/A'}<br>
+                            📧 Email: ${email}<br>
+                            🔑 Token recibido: ${authToken ? 'Sí (' + authToken.substring(0, 20) + '...)' : 'No'}<br>
+                            📊 Rol: ${data.data?.user?.rol || data.user?.rol || 'N/A'}<br><br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    statusIcon.className = 'status-icon error';
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            ❌ <strong>Login fallido</strong><br>
+                            ${data.message || 'Error desconocido'}<br><br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                statusIcon.className = 'status-icon error';
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        ❌ <strong>Error en la petición</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        // Test 3: Obtener perfiles
+        async function testGetProfiles() {
+            const statusIcon = document.getElementById('status3');
+            const resultDiv = document.getElementById('result3');
+            
+            if (!authToken) {
+                statusIcon.className = 'status-icon error';
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        ❌ <strong>No autenticado</strong><br>
+                        Primero debes hacer login en el Test 2
+                    </div>
+                `;
+                return;
+            }
+            
+            statusIcon.className = 'status-icon pending';
+            resultDiv.innerHTML = '<div class="result">⏳ Obteniendo perfiles...</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/perfiles`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const perfiles = data.data || data;
+                    statusIcon.className = 'status-icon success';
+                    
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            ✅ <strong>Perfiles obtenidos exitosamente</strong><br>
+                            📊 Total: ${Array.isArray(perfiles) ? perfiles.length : 'N/A'} perfiles<br><br>
+                            <pre>${JSON.stringify(perfiles, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    statusIcon.className = 'status-icon error';
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            ❌ <strong>Error al obtener perfiles</strong><br>
+                            ${data.message || 'Error desconocido'}<br><br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                statusIcon.className = 'status-icon error';
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        ❌ <strong>Error en la petición</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        // Test 4: Obtener ingresos
+        async function testGetIngresos() {
+            const statusIcon = document.getElementById('status4');
+            const resultDiv = document.getElementById('result4');
+            
+            if (!authToken) {
+                statusIcon.className = 'status-icon error';
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        ❌ <strong>No autenticado</strong><br>
+                        Primero debes hacer login en el Test 2
+                    </div>
+                `;
+                return;
+            }
+            
+            statusIcon.className = 'status-icon pending';
+            resultDiv.innerHTML = '<div class="result">⏳ Obteniendo ingresos...</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/ingresos`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const ingresos = data.data || data;
+                    statusIcon.className = 'status-icon success';
+                    
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            ✅ <strong>Ingresos obtenidos exitosamente</strong><br>
+                            💰 Total: ${Array.isArray(ingresos) ? ingresos.length : 'N/A'} ingresos<br><br>
+                            <pre>${JSON.stringify(ingresos, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    statusIcon.className = 'status-icon error';
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            ❌ <strong>Error al obtener ingresos</strong><br>
+                            ${data.message || 'Error desconocido'}<br><br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                statusIcon.className = 'status-icon error';
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        ❌ <strong>Error en la petición</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        // Auto-test al cargar la página
+        window.onload = () => {
+            console.log('🚀 Test de conexión Backend - Finaizen');
+            console.log('📡 API URL:', API_URL);
+            testServerStatus();
+        };
+    </script>
+</body>
+</html>

@@ -11,18 +11,22 @@ import {
   InviteUserModal, 
   ConfirmActionModal 
 } from '../../../components/users/UserModals';
-import { usersData, ROLES } from '../../../utils/usersData';
+import apiService from '../../../services/apiService';
 import { adminSidebarMenuItems, adminDropdownMenuItems } from '../../../config/adminSidebarConfig';
 import styles from './GestionUsuarios.module.css';
+
+// Roles disponibles
+const ROLES = ['user', 'admin', 'moderador'];
 
 function GestionUsuarios() {
   const { currentUser, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [loading, setLoading] = useState(true);
   
   // Estado de usuarios
-  const [users, setUsers] = useState(usersData);
-  const [filteredUsers, setFilteredUsers] = useState(usersData);
+  const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
   
   // Estados de modales
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -47,6 +51,44 @@ function GestionUsuarios() {
       navigate('/login');
     }
   }, [currentUser, isAdmin, navigate]);
+
+  // Cargar usuarios desde el backend
+  useEffect(() => {
+    const loadUsers = async () => {
+      if (!currentUser || !isAdmin) return;
+      
+      try {
+        setLoading(true);
+        const usersFromBackend = await apiService.users.getAll();
+        
+        // Transformar datos para el formato esperado por los componentes
+        const transformedUsers = usersFromBackend.map(u => ({
+          id: u.id,
+          name: `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.nombreUsuario,
+          email: u.correo,
+          role: u.rol || 'user',
+          status: u.activo !== false ? 'activo' : 'suspendido',
+          date: new Date(u.createdAt).toLocaleDateString('es-ES'),
+          isPremium: u.isPremium,
+          // Datos adicionales para el modal de ver
+          nombre: u.nombre,
+          apellido: u.apellido,
+          pais: u.pais,
+          ciudad: u.ciudad,
+          genero: u.genero
+        }));
+        
+        setUsers(transformedUsers);
+        setFilteredUsers(transformedUsers);
+      } catch (error) {
+        console.error('Error cargando usuarios:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadUsers();
+  }, [currentUser, isAdmin]);
 
   // Calcular KPIs
   const totalUsers = users.length;
@@ -119,26 +161,43 @@ function GestionUsuarios() {
   };
 
   // Handlers de modales
-  const handleSaveRole = (userId, newRole) => {
-    setUsers(prev => prev.map(u => 
-      u.id === userId ? { ...u, role: newRole } : u
-    ));
-    setFilteredUsers(prev => prev.map(u => 
-      u.id === userId ? { ...u, role: newRole } : u
-    ));
+  const handleSaveRole = async (userId, newRole) => {
+    try {
+      await apiService.users.update(userId, { rol: newRole });
+      setUsers(prev => prev.map(u => 
+        u.id === userId ? { ...u, role: newRole } : u
+      ));
+      setFilteredUsers(prev => prev.map(u => 
+        u.id === userId ? { ...u, role: newRole } : u
+      ));
+      setEditModalOpen(false);
+    } catch (error) {
+      console.error('Error actualizando rol:', error);
+      alert('Error al actualizar el rol');
+    }
   };
 
-  const handleConfirmAction = (userId) => {
-    setUsers(prev => prev.map(u => 
-      u.id === userId 
-        ? { ...u, status: u.status === 'activo' ? 'suspendido' : 'activo' } 
-        : u
-    ));
-    setFilteredUsers(prev => prev.map(u => 
-      u.id === userId 
-        ? { ...u, status: u.status === 'activo' ? 'suspendido' : 'activo' } 
-        : u
-    ));
+  const handleConfirmAction = async (userId) => {
+    try {
+      const user = users.find(u => u.id === userId);
+      const newStatus = user.status === 'activo' ? false : true;
+      await apiService.users.update(userId, { activo: newStatus });
+      
+      setUsers(prev => prev.map(u => 
+        u.id === userId 
+          ? { ...u, status: newStatus ? 'activo' : 'suspendido' } 
+          : u
+      ));
+      setFilteredUsers(prev => prev.map(u => 
+        u.id === userId 
+          ? { ...u, status: newStatus ? 'activo' : 'suspendido' } 
+          : u
+      ));
+      setConfirmModalOpen(false);
+    } catch (error) {
+      console.error('Error cambiando estado:', error);
+      alert('Error al cambiar el estado del usuario');
+    }
   };
 
   const handleInvite = (email, role) => {

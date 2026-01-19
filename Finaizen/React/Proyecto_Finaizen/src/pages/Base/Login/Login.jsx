@@ -65,28 +65,34 @@ function Login() {
   };
 
   // Manejo del submit (onSubmit)
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (validateForm()) {
-      // Login real con mockDB
-      const result = login(formData.email, formData.password);
-      
-      if (result.success) {
-        setMessageType('success');
-        setMessage('¡Inicio de sesión exitoso! Redirigiendo...');
+      try {
+        // Login con backend API
+        const result = await login(formData.email, formData.password);
         
-        // Redirigir según el rol del usuario
-        setTimeout(() => {
-          if (result.user.rol === 'admin') {
-            navigate('/admin/dashboard');
-          } else {
-            navigate('/user/dashboard');
-          }
-        }, 1000);
-      } else {
+        if (result.success) {
+          setMessageType('success');
+          setMessage('¡Inicio de sesión exitoso! Redirigiendo...');
+          
+          // Redirigir según el rol del usuario
+          setTimeout(() => {
+            if (result.user.rol === 'admin') {
+              navigate('/admin/dashboard');
+            } else {
+              navigate('/user/dashboard');
+            }
+          }, 1000);
+        } else {
+          setMessageType('error');
+          setMessage(result.message || 'Credenciales incorrectas. Por favor, verifica tu correo y contraseña.');
+        }
+      } catch (error) {
         setMessageType('error');
-        setMessage(result.message || 'Credenciales incorrectas. Por favor, verifica tu correo y contraseña.');
+        setMessage('Error al iniciar sesión. Por favor, intenta de nuevo.');
+        console.error('Error en login:', error);
       }
     }
   };

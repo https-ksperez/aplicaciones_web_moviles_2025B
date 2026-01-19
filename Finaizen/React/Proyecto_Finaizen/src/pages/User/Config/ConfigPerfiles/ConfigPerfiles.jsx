@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
-import mockDB, { EventTypes, EventCategories, SeverityLevels, EventStatus } from '../../../../utils/mockDatabase';
-import Perfil from '../../../../models/Perfil';
+import apiService from '../../../../services/apiService';
 import { Toast, ConfirmDialog } from '../../../../components/ui';
 import ProfileCard from '../../../../components/cards/ProfileCard';
 import ProfileModal from '../../../../components/modals/ProfileModal';
@@ -29,7 +28,7 @@ const ConfigPerfiles = () => {
     setEditingPerfil(null);
   };
 
-  const handleSubmit = (formData) => {
+  const handleSubmit = async (formData) => {
     if (!formData.nombre.trim()) {
       showToast('El nombre del perfil es requerido', 'error');
       return;
@@ -38,38 +37,16 @@ const ConfigPerfiles = () => {
     try {
       if (editingPerfil) {
         // Editar perfil existente
-        const perfilIndex = mockDB.perfiles.findIndex(p => p.id === editingPerfil.id);
-        if (perfilIndex !== -1) {
-          mockDB.perfiles[perfilIndex] = {
-            ...mockDB.perfiles[perfilIndex],
-            nombre: formData.nombre,
-            moneda: formData.moneda
-          };
-          mockDB.saveToLocalStorage();
+        await apiService.perfiles.update(editingPerfil.id, {
+          nombre: formData.nombre,
+          moneda: formData.moneda
+        });
 
-          mockDB.createSecurityLog({
-            userId: currentUser.id,
-            userEmail: currentUser.email,
-            eventType: EventTypes.PROFILE_UPDATED,
-            eventCategory: EventCategories.CONFIGURACION,
-            description: `Perfil "${formData.nombre}" actualizado`,
-            status: EventStatus.SUCCESS,
-            severity: SeverityLevels.LOW,
-            metadata: { perfilId: editingPerfil.id }
-          });
-
-          actualizarPerfiles();
-          handleCloseModal();
-          showToast('✅ Perfil actualizado correctamente', 'success');
-        }
+        actualizarPerfiles();
+        handleCloseModal();
+        showToast('✅ Perfil actualizado correctamente', 'success');
       } else {
         // Crear nuevo perfil
-        // Generar nuevo ID
-        const newPerfilId = mockDB.perfiles.length > 0
-          ? Math.max(...mockDB.perfiles.map(p => p.id)) + 1
-          : 1;
-
-        // Obtener símbolo de moneda según la moneda seleccionada
         const simbolosMoneda = {
           'USD': '$',
           'EUR': '€',
@@ -77,30 +54,11 @@ const ConfigPerfiles = () => {
           'COP': '$'
         };
         
-        // Crear el nuevo perfil
-        const newPerfil = new Perfil({
-          id: newPerfilId,
+        await apiService.perfiles.create({
           userId: currentUser.id,
           nombre: formData.nombre,
           moneda: formData.moneda,
           simboloMoneda: simbolosMoneda[formData.moneda] || '$'
-        });
-
-        // Agregar perfil al usuario y a la base de datos
-        const userFromDB = mockDB.users.find(u => u.id === currentUser.id);
-        userFromDB.agregarPerfil(newPerfil.id);
-        mockDB.perfiles.push(newPerfil);
-        mockDB.saveToLocalStorage();
-
-        mockDB.createSecurityLog({
-          userId: currentUser.id,
-          userEmail: currentUser.email,
-          eventType: EventTypes.PERFIL_CREATED,
-          eventCategory: EventCategories.CONFIGURACION,
-          description: `Nuevo perfil "${formData.nombre}" creado`,
-          status: EventStatus.SUCCESS,
-          severity: SeverityLevels.LOW,
-          metadata: { perfilId: newPerfil.id }
         });
 
         actualizarPerfiles();
@@ -138,27 +96,17 @@ const ConfigPerfiles = () => {
     showToast(`✅ Cambiado a perfil: ${perfil.nombre}`, 'success');
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!perfilToDelete) return;
 
-    const index = mockDB.perfiles.findIndex(p => p.id === perfilToDelete.id);
-    if (index !== -1) {
-      mockDB.perfiles.splice(index, 1);
-      mockDB.saveToLocalStorage();
-
-      mockDB.createSecurityLog({
-        userId: currentUser.id,
-        userEmail: currentUser.email,
-        eventType: EventTypes.PERFIL_DELETED,
-        eventCategory: EventCategories.CONFIGURACION,
-        description: `Perfil "${perfilToDelete.nombre}" eliminado`,
-        status: EventStatus.SUCCESS,
-        severity: SeverityLevels.MEDIUM,
-        metadata: { perfilId: perfilToDelete.id }
-      });
+    try {
+      await apiService.perfiles.delete(perfilToDelete.id);
 
       showToast('✅ Perfil eliminado correctamente', 'success');
       actualizarPerfiles();
+    } catch (error) {
+      console.error('Error al eliminar perfil:', error);
+      showToast('❌ Error al eliminar el perfil', 'error');
     }
 
     setShowConfirmDialog(false);

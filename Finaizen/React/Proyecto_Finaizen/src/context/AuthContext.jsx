@@ -1,9 +1,10 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import mockDB, { EventTypes, EventCategories, SeverityLevels, EventStatus } from '../utils/mockDatabase';
+import apiService from '../services/apiService';
 
 /**
  * AuthContext - Contexto de Autenticación Global
  * Maneja el estado de autenticación en toda la aplicación
+ * Conectado al backend PostgreSQL
  */
 const AuthContext = createContext(null);
 
@@ -33,34 +34,39 @@ export const AuthProvider = ({ children }) => {
 
   // Cargar sesión guardada al iniciar
   useEffect(() => {
-    const loadSession = () => {
+    const loadSession = async () => {
       try {
-        // Intentar cargar sesión desde localStorage
-        const savedSession = localStorage.getItem('finaizen_session');
-        if (savedSession) {
+        const token = sessionStorage.getItem('authToken');
+        const savedSession = sessionStorage.getItem('finaizen_session');
+        
+        if (token && savedSession) {
           const { userId, perfilId } = JSON.parse(savedSession);
           
-          // Buscar usuario en mockDB
-          const user = mockDB.users.find(u => u.id === userId);
-          if (user) {
-            mockDB.currentUser = user;
-            setCurrentUser(user);
-
-            // Cargar perfiles del usuario
-            const userPerfiles = mockDB.getPerfilesDeUsuario(userId);
-            setPerfiles(userPerfiles);
-
-            // Buscar perfil activo
-            const perfil = userPerfiles.find(p => p.id === perfilId) || userPerfiles[0];
-            if (perfil) {
-              mockDB.currentPerfil = perfil;
-              setCurrentPerfil(perfil);
-            }
+          console.log('🔄 Cargando sesión desde backend...');
+          
+          // Obtener usuario del backend
+          const userData = await apiService.auth.me();
+          console.log('✅ Usuario cargado desde backend:', userData);
+          
+          setCurrentUser(userData.user);
+          
+          // Obtener perfiles del backend
+          const perfilesData = await apiService.perfiles.getAll();
+          console.log('✅ Perfiles cargados desde backend:', perfilesData);
+          
+          setPerfiles(perfilesData);
+          
+          // Establecer perfil activo
+          const perfil = perfilesData.find(p => p.id === perfilId) || perfilesData[0];
+          if (perfil) {
+            setCurrentPerfil(perfil);
+            console.log('✅ Perfil activo:', perfil.nombre);
           }
         }
       } catch (error) {
-        console.error('Error al cargar sesión:', error);
-        localStorage.removeItem('finaizen_session');
+        console.error('❌ Error al cargar sesión:', error);
+        sessionStorage.removeItem('authToken');
+        sessionStorage.removeItem('finaizen_session');
       } finally {
         setLoading(false);
       }
@@ -75,61 +81,69 @@ export const AuthProvider = ({ children }) => {
    * @param {string} contraseña - Contraseña
    * @returns {Object} Resultado del login
    */
-  const login = (correoOUsername, contraseña) => {
-    // Verificar si el usuario está bloqueado
-    const isBlocked = mockDB.isUserBlocked(correoOUsername);
-    if (isBlocked) {
+  const login = async (correoOUsername, contraseña) => {
+    try {
+      console.log('🔐 Iniciando sesión con backend...');
+      
+      // Llamar al API de login con el formato correcto
+      const result = await apiService.auth.login({
+        correo: correoOUsername,
+        contraseña: contraseña
+      });
+      
+      console.log('✅ Login exitoso desde backend:', result);
+      
+      if (result.user) {
+        setCurrentUser(result.user);
+        
+        // Obtener perfiles del usuario
+        const perfilesData = await apiService.perfiles.getAll();
+        setPerfiles(perfilesData);
+        
+        // Establecer primer perfil como activo
+        const perfil = perfilesData[0];
+        if (perfil) {
+          setCurrentPerfil(perfil);
+          
+          // Guardar sesión (sessionStorage para sesión aislada por pestaña)
+          sessionStorage.setItem('finaizen_session', JSON.stringify({
+            userId: result.user.id,
+            perfilId: perfil.id
+          }));
+        }
+        
+        return {
+          success: true,
+          user: result.user,
+          perfil
+        };
+      }
+      
       return {
         success: false,
-        message: 'Cuenta temporalmente bloqueada por múltiples intentos fallidos. Intente más tarde.'
+        message: 'Error al obtener datos del usuario'
+      };
+    } catch (error) {
+      console.error('❌ Error en login:', error);
+      return {
+        success: false,
+        message: error.message || 'Credenciales inválidas'
       };
     }
-
-    const result = mockDB.login(correoOUsername, contraseña);
-    
-    // Registrar intento de login
-    mockDB.trackLoginAttempt(correoOUsername, result.success);
-    
-    if (result.success) {
-      setCurrentUser(result.user);
-      setCurrentPerfil(result.perfil);
-      
-      // Cargar perfiles del usuario
-      const userPerfiles = mockDB.getPerfilesDeUsuario(result.user.id);
-      setPerfiles(userPerfiles);
-
-      // Guardar sesión en localStorage
-      localStorage.setItem('finaizen_session', JSON.stringify({
-        userId: result.user.id,
-        perfilId: result.perfil.id
-      }));
-    }
-    
-    return result;
   };
 
   /**
    * Cierra sesión
    */
   const logout = () => {
-    // Registrar logout
-    if (currentUser) {
-      mockDB.createSecurityLog({
-        userId: currentUser.id,
-        userEmail: currentUser.email,
-        eventType: EventTypes.LOGOUT,
-        eventCategory: EventCategories.AUTENTICACION,
-        description: 'Cierre de sesión',
-        status: EventStatus.SUCCESS,
-        severity: SeverityLevels.LOW
-      });
-    }
+    console.log('👋 Cerrando sesión...');
     
-    mockDB.logout();
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('finaizen_session');
+    
     setCurrentUser(null);
     setCurrentPerfil(null);
     setPerfiles([]);
-    localStorage.removeItem('finaizen_session');
   };
 
   /**
@@ -137,53 +151,49 @@ export const AuthProvider = ({ children }) => {
    * @param {Object} userData - Datos del usuario
    * @returns {Object} Resultado del registro
    */
-  const register = (userData) => {
-    const result = mockDB.register(userData);
-    
-    if (result.success) {
-      // Registrar evento de creación de cuenta
-      mockDB.createSecurityLog({
-        userId: result.user.id,
-        userEmail: result.user.email,
-        eventType: EventTypes.ACCOUNT_CREATED,
-        eventCategory: EventCategories.ACCESO,
-        description: 'Nueva cuenta creada',
-        status: EventStatus.SUCCESS,
-        severity: SeverityLevels.MEDIUM,
-        metadata: {
-          userName: result.user.nombre,
-          rol: result.user.rol
+  const register = async (userData) => {
+    try {
+      console.log('📝 Registrando nuevo usuario...');
+      
+      const result = await apiService.auth.register(userData);
+      
+      console.log('✅ Registro exitoso:', result);
+      
+      if (result.user) {
+        setCurrentUser(result.user);
+        
+        // Obtener perfiles
+        const perfilesData = await apiService.perfiles.getAll();
+        setPerfiles(perfilesData);
+        
+        const perfil = perfilesData[0];
+        if (perfil) {
+          setCurrentPerfil(perfil);
+          
+          sessionStorage.setItem('finaizen_session', JSON.stringify({
+            userId: result.user.id,
+            perfilId: perfil.id
+          }));
         }
-      });
-
-      // Registrar creación de perfil inicial
-      mockDB.createSecurityLog({
-        userId: result.user.id,
-        userEmail: result.user.email,
-        eventType: EventTypes.PERFIL_CREATED,
-        eventCategory: EventCategories.CONFIGURACION,
-        description: `Perfil financiero creado: ${result.perfil.nombre}`,
-        status: EventStatus.SUCCESS,
-        severity: SeverityLevels.MEDIUM,
-        metadata: {
-          perfilId: result.perfil.id,
-          perfilNombre: result.perfil.nombre,
-          moneda: result.perfil.moneda
-        }
-      });
-
-      setCurrentUser(result.user);
-      setCurrentPerfil(result.perfil);
-      setPerfiles([result.perfil]);
-
-      // Guardar sesión
-      localStorage.setItem('finaizen_session', JSON.stringify({
-        userId: result.user.id,
-        perfilId: result.perfil.id
-      }));
+        
+        return {
+          success: true,
+          user: result.user,
+          perfil
+        };
+      }
+      
+      return {
+        success: false,
+        message: 'Error al crear usuario'
+      };
+    } catch (error) {
+      console.error('❌ Error en registro:', error);
+      return {
+        success: false,
+        message: error.message || 'Error al registrar usuario'
+      };
     }
-    
-    return result;
   };
 
   /**
@@ -193,28 +203,14 @@ export const AuthProvider = ({ children }) => {
   const cambiarPerfil = (perfilId) => {
     const perfil = perfiles.find(p => p.id === perfilId);
     if (perfil && currentUser) {
-      mockDB.currentPerfil = perfil;
       setCurrentPerfil(perfil);
-
-      // Registrar cambio de perfil
-      mockDB.createSecurityLog({
-        userId: currentUser.id,
-        userEmail: currentUser.email,
-        eventType: EventTypes.PERFIL_SWITCHED,
-        eventCategory: EventCategories.CONFIGURACION,
-        description: `Cambio a perfil: ${perfil.nombre}`,
-        status: EventStatus.SUCCESS,
-        severity: SeverityLevels.LOW,
-        metadata: {
-          perfilId: perfil.id,
-          perfilNombre: perfil.nombre
-        }
-      });
+      
+      console.log('🔄 Perfil cambiado a:', perfil.nombre);
 
       // Actualizar sesión guardada
-      const session = JSON.parse(localStorage.getItem('finaizen_session') || '{}');
+      const session = JSON.parse(sessionStorage.getItem('finaizen_session') || '{}');
       session.perfilId = perfilId;
-      localStorage.setItem('finaizen_session', JSON.stringify(session));
+      sessionStorage.setItem('finaizen_session', JSON.stringify(session));
     }
   };
 
@@ -224,21 +220,25 @@ export const AuthProvider = ({ children }) => {
    */
   const updateUser = (updatedUser) => {
     setCurrentUser(updatedUser);
-    mockDB.currentUser = updatedUser;
     
     // Actualizar sesión guardada
-    const session = JSON.parse(localStorage.getItem('finaizen_session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('finaizen_session') || '{}');
     session.userId = updatedUser.id;
-    localStorage.setItem('finaizen_session', JSON.stringify(session));
+    sessionStorage.setItem('finaizen_session', JSON.stringify(session));
   };
 
   /**
    * Actualiza la lista de perfiles (útil después de crear uno nuevo)
    */
-  const actualizarPerfiles = () => {
+  const actualizarPerfiles = async () => {
     if (currentUser) {
-      const userPerfiles = mockDB.getPerfilesDeUsuario(currentUser.id);
-      setPerfiles(userPerfiles);
+      try {
+        const perfilesData = await apiService.perfiles.getAll();
+        setPerfiles(perfilesData);
+        console.log('✅ Perfiles actualizados desde backend');
+      } catch (error) {
+        console.error('❌ Error al actualizar perfiles:', error);
+      }
     }
   };
 

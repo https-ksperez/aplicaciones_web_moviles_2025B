@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
-import mockDB, { EventTypes, EventCategories, SeverityLevels, EventStatus } from '../../../../utils/mockDatabase';
+import apiService from '../../../../services/apiService';
 import { Card, Button, Input, Toggle, Toast } from '../../../../components/ui';
 import styles from './ConfigSeguridad.module.css';
 
@@ -18,7 +18,7 @@ const ConfigSeguridad = () => {
 
   useEffect(() => {
     if (currentUser) {
-      setTwoFactorEnabled(mockDB.securityConfig.require2FA || false);
+      setTwoFactorEnabled(currentUser.twoFactorEnabled || false);
     }
   }, [currentUser]);
 
@@ -49,43 +49,10 @@ const ConfigSeguridad = () => {
       return;
     }
 
-    // Obtener el usuario actual directamente desde mockDB para asegurar que tenga todos los métodos
-    const userFromDB = mockDB.users.find(u => u.id === currentUser.id);
-    
-    if (!userFromDB || !userFromDB.verificarContraseña(passwords.current)) {
-      setPasswordError('La contraseña actual es incorrecta');
-      setIsLoading(false);
-
-      mockDB.createSecurityLog({
-        userId: currentUser.id,
-        userEmail: currentUser.email || currentUser.correo,
-        eventType: EventTypes.PASSWORD_CHANGE_FAILED,
-        eventCategory: EventCategories.CONFIGURACION,
-        description: 'Intento fallido de cambio de contraseña - contraseña actual incorrecta',
-        status: EventStatus.FAILURE,
-        severity: SeverityLevels.MEDIUM
-      });
-
-      return;
-    }
-
     try {
-      // Actualizar contraseña directamente en la instancia de User
-      userFromDB.contraseña = passwords.new;
-      userFromDB.updatedAt = new Date();
-      mockDB.saveToLocalStorage();
-      
-      // Actualizar contexto con el usuario actualizado
-      updateUser(userFromDB);
-
-      mockDB.createSecurityLog({
-        userId: currentUser.id,
-        userEmail: currentUser.email || currentUser.correo,
-        eventType: EventTypes.PASSWORD_CHANGED,
-        eventCategory: EventCategories.CONFIGURACION,
-        description: 'Contraseña cambiada exitosamente',
-        status: EventStatus.SUCCESS,
-        severity: SeverityLevels.LOW
+      await apiService.auth.cambiarContrasena({
+        currentPassword: passwords.current,
+        newPassword: passwords.new
       });
 
       setPasswords({ current: '', new: '', confirm: '' });
@@ -93,31 +60,30 @@ const ConfigSeguridad = () => {
 
     } catch (error) {
       console.error('Error al cambiar contraseña:', error);
-      showToast('❌ Error al cambiar la contraseña', 'error');
+      if (error.message?.includes('incorrecta')) {
+        setPasswordError('La contraseña actual es incorrecta');
+      } else {
+        showToast('❌ Error al cambiar la contraseña', 'error');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleTwoFactorToggle = (newValue) => {
-    setTwoFactorEnabled(newValue);
-    mockDB.securityConfig.require2FA = newValue;
-    mockDB.saveToLocalStorage();
-
-    mockDB.createSecurityLog({
-      userId: currentUser.id,
-      userEmail: currentUser.email,
-      eventType: newValue ? EventTypes.TWO_FACTOR_ENABLED : EventTypes.TWO_FACTOR_DISABLED,
-      eventCategory: EventCategories.CONFIGURACION,
-      description: `Autenticación de dos factores ${newValue ? 'activada' : 'desactivada'}`,
-      status: EventStatus.SUCCESS,
-      severity: SeverityLevels.MEDIUM
-    });
-
-    showToast(
-      `${newValue ? '✅ 2FA activado' : '⚠️ 2FA desactivado'}`, 
-      newValue ? 'success' : 'warning'
-    );
+  const handleTwoFactorToggle = async (newValue) => {
+    try {
+      setTwoFactorEnabled(newValue);
+      await apiService.users.update(currentUser.id, { twoFactorEnabled: newValue });
+      
+      showToast(
+        `${newValue ? '✅ 2FA activado' : '⚠️ 2FA desactivado'}`, 
+        newValue ? 'success' : 'warning'
+      );
+    } catch (error) {
+      console.error('Error al cambiar 2FA:', error);
+      setTwoFactorEnabled(!newValue); // Revertir
+      showToast('❌ Error al cambiar configuración de 2FA', 'error');
+    }
   };
 
   return (

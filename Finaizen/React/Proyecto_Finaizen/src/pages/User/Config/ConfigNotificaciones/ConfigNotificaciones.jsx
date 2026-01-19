@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
-import mockDB, { EventTypes, EventCategories, SeverityLevels, EventStatus } from '../../../../utils/mockDatabase';
+import apiService from '../../../../services/apiService';
 import { Toast, Toggle } from '../../../../components/ui';
 import styles from './ConfigNotificaciones.module.css';
 
@@ -18,13 +18,22 @@ const ConfigNotificaciones = () => {
 
   // Cargar datos
   useEffect(() => {
-    if (currentPerfil) {
-      // Filtrar solo registros NO ocasionales (frecuentes)
-      const ing = mockDB.getIngresosDePerf(currentPerfil.id).filter(i => i.frecuencia !== 'ocasional');
-      const egr = mockDB.getEgresosDePerf(currentPerfil.id).filter(e => e.frecuencia !== 'ocasional');
-      setIngresos(ing);
-      setEgresos(egr);
-    }
+    const cargarDatos = async () => {
+      if (currentPerfil) {
+        try {
+          const [ingresosData, egresosData] = await Promise.all([
+            apiService.ingresos.getAll(currentPerfil.id),
+            apiService.egresos.getAll(currentPerfil.id)
+          ]);
+          // Filtrar solo registros NO ocasionales (frecuentes)
+          setIngresos(ingresosData.filter(i => i.frecuencia !== 'ocasional'));
+          setEgresos(egresosData.filter(e => e.frecuencia !== 'ocasional'));
+        } catch (error) {
+          console.error('Error al cargar datos:', error);
+        }
+      }
+    };
+    cargarDatos();
   }, [currentPerfil]);
 
   const showToast = (message, type = 'success') => {
@@ -45,35 +54,44 @@ const ConfigNotificaciones = () => {
   const egresosFiltrados = filtrarPorEstado(egresos);
 
   // Toggle notificación
-  const handleToggleNotificacion = (tipo, id) => {
-    if (tipo === 'ingreso') {
-      const ingreso = ingresos.find(i => i.id === id);
-      if (ingreso) {
-        ingreso.notificacionActiva = !ingreso.notificacionActiva;
-        setIngresos([...ingresos]);
-        mockDB.saveToLocalStorage();
-        
-        showToast(
-          ingreso.notificacionActiva 
-            ? '✅ Notificación activada' 
-            : '🔕 Notificación desactivada',
-          'success'
-        );
+  const handleToggleNotificacion = async (tipo, id) => {
+    try {
+      if (tipo === 'ingreso') {
+        const ingreso = ingresos.find(i => i.id === id);
+        if (ingreso) {
+          const nuevoEstado = !ingreso.notificacionActiva;
+          await apiService.ingresos.update(id, { notificacionActiva: nuevoEstado });
+          
+          ingreso.notificacionActiva = nuevoEstado;
+          setIngresos([...ingresos]);
+          
+          showToast(
+            nuevoEstado 
+              ? '✅ Notificación activada' 
+              : '🔕 Notificación desactivada',
+            'success'
+          );
+        }
+      } else {
+        const egreso = egresos.find(e => e.id === id);
+        if (egreso) {
+          const nuevoEstado = !egreso.notificacionActiva;
+          await apiService.egresos.update(id, { notificacionActiva: nuevoEstado });
+          
+          egreso.notificacionActiva = nuevoEstado;
+          setEgresos([...egresos]);
+          
+          showToast(
+            nuevoEstado 
+              ? '✅ Notificación activada' 
+              : '🔕 Notificación desactivada',
+            'success'
+          );
+        }
       }
-    } else {
-      const egreso = egresos.find(e => e.id === id);
-      if (egreso) {
-        egreso.notificacionActiva = !egreso.notificacionActiva;
-        setEgresos([...egresos]);
-        mockDB.saveToLocalStorage();
-        
-        showToast(
-          egreso.notificacionActiva 
-            ? '✅ Notificación activada' 
-            : '🔕 Notificación desactivada',
-          'success'
-        );
-      }
+    } catch (error) {
+      console.error('Error al cambiar notificación:', error);
+      showToast('Error al cambiar notificación', 'error');
     }
   };
 
@@ -94,7 +112,7 @@ const ConfigNotificaciones = () => {
           </div>
           <div className={styles.cardRight}>
             <span className={`${styles.amount} ${colorClase}`}>
-              ${item.monto.toFixed(2)}
+              ${parseFloat(item.monto || 0).toFixed(2)}
             </span>
             <div className={styles.toggleWrapper}>
               <Toggle

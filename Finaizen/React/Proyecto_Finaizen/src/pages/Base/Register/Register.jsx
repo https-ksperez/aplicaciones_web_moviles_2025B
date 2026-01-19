@@ -31,7 +31,7 @@ function Register() {
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Validación completa
@@ -52,28 +52,34 @@ function Register() {
     setErrors(newErrors);
     
     if (Object.keys(newErrors).length === 0) {
-      // Registro real con mockDB
-      const result = register({
-        nombre: formData.firstName,
-        apellido: formData.lastName,
-        correo: formData.email,
-        nombreUsuario: formData.username,
-        contraseña: formData.password,
-        pais: formData.country,
-        fechaNacimiento: formData.birthdate,
-      });
+      try {
+        // Registro con backend API
+        const result = await register({
+          nombre: formData.firstName,
+          apellido: formData.lastName,
+          correo: formData.email,
+          nombreUsuario: formData.username,
+          contraseña: formData.password,
+          pais: formData.country,
+          fechaNacimiento: formData.birthdate,
+        });
 
-      if (result.success) {
-        setMessageType('success');
-        setMessage('¡Registro exitoso! Redirigiendo al dashboard...');
-        
-        // Redirigir al dashboard después de 1 segundo
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 1000);
-      } else {
+        if (result.success) {
+          setMessageType('success');
+          setMessage('¡Registro exitoso! Redirigiendo al dashboard...');
+          
+          // Redirigir al dashboard después de 1 segundo
+          setTimeout(() => {
+            navigate('/user/dashboard');
+          }, 1000);
+        } else {
+          setMessageType('error');
+          setMessage(result.message || 'Error al registrar. Por favor, intenta de nuevo.');
+        }
+      } catch (error) {
         setMessageType('error');
-        setMessage(result.message || 'Error al registrar. Por favor, intenta de nuevo.');
+        setMessage('Error al registrar. Por favor, intenta de nuevo.');
+        console.error('Error en registro:', error);
       }
     }
   };

@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import mockDB from '../../utils/mockDatabase';
-import { Egreso, RegistroHistorial } from '../../models';
+import apiService from '../../services/apiService';
 import { extractTextFromImage, parseReceiptText } from '../../services/ocrService';
 import { VoiceRecognition, isSpeechRecognitionSupported, parseVoiceExpense } from '../../services/speechService';
 import styles from './QuickExpenseModal.module.css';
@@ -211,24 +210,17 @@ function QuickExpenseModal({ isOpen, onClose }) {
       const tipoTransaccion = expenseData.tipo || 'egreso';
       const esIngreso = tipoTransaccion === 'ingreso';
 
-      // Crear registro en historial
-      const historialId = mockDB.historial.length > 0 
-        ? Math.max(...mockDB.historial.map(t => t.id)) + 1 
-        : 1;
-
       const [year, month, day] = expenseData.fecha.split('-').map(Number);
       const fechaEjecucion = new Date(year, month - 1, day);
 
-      const registroHistorial = new RegistroHistorial({
-        id: historialId,
-        perfilId: currentPerfil.id,
+      const registroHistorial = {
         tipo: tipoTransaccion, // 'ingreso' o 'egreso'
         monto: parseFloat(expenseData.monto),
         descripcion: expenseData.descripcion,
         categoria: expenseData.categoria,
         transaccionOrigenId: null,
         esOcasional: true,
-        fechaEjecucion: fechaEjecucion,
+        fechaEjecucion: fechaEjecucion.toISOString(),
         mes: fechaEjecucion.getMonth() + 1,
         anio: fechaEjecucion.getFullYear(),
         metadata: {
@@ -237,15 +229,9 @@ function QuickExpenseModal({ isOpen, onClose }) {
           voiceTranscript: voiceTranscript || undefined,
           confianzaOCR: expenseData.confianza || undefined
         }
-      });
+      };
 
-      mockDB.historial.push(registroHistorial);
-
-      if (currentPerfil.agregarTransaccion) {
-        currentPerfil.agregarTransaccion(registroHistorial);
-      }
-
-      mockDB.saveToLocalStorage();
+      await apiService.historial.create(currentPerfil.id, registroHistorial);
 
       console.log(`✅ ${esIngreso ? 'Ingreso' : 'Gasto'} rápido registrado:`, registroHistorial);
 

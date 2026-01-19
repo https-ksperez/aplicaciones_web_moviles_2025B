@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import mockDB from '../../../utils/mockDatabase';
+import apiService from '../../../services/apiService';
 import { Button, Toast } from '../../../components/ui';
 import PlanCard from '../../../components/cards/PlanCard';
 import PlanAhorroModal from '../../../components/modals/PlanAhorroModal';
@@ -28,49 +28,143 @@ function PlanAhorro() {
   const [consejos, setConsejos] = useState([]);
   const [estadisticas, setEstadisticas] = useState(null);
 
-  const cargarDatos = useCallback(() => {
+  // Ref para acceder al selectedPlan actual sin causar re-renders
+  const selectedPlanRef = useRef(null);
+  selectedPlanRef.current = selectedPlan;
+
+  const cargarDatos = useCallback(async () => {
     if (!currentPerfil) return;
 
     setLoading(true);
-    const planesDelPerfil = mockDB.getPlanesDePerfil(currentPerfil.id);
-    setPlanes(planesDelPerfil);
+    try {
+      const planesDelPerfil = await apiService.planesAhorro.getAll(currentPerfil.id);
+      
+      // Transformar planes con campos calculados para PlanCard
+      const hoy = new Date();
+      const planesTransformados = planesDelPerfil.map(p => {
+        const montoActual = parseFloat(p.montoActual || 0);
+        const montoMeta = parseFloat(p.montoMeta || 0);
+        const montoFaltante = Math.max(0, montoMeta - montoActual);
+        const progreso = montoMeta > 0 ? (montoActual / montoMeta) * 100 : 0;
+        
+        let diasRestantes = 0;
+        if (p.fechaObjetivo) {
+          const fechaObjetivo = new Date(p.fechaObjetivo);
+          diasRestantes = Math.ceil((fechaObjetivo - hoy) / (1000 * 60 * 60 * 24));
+        }
 
-    // Cargar estadísticas
-    const stats = mockDB.obtenerEstadisticasAhorro(currentPerfil.id);
-    setEstadisticas(stats);
+        // Calcular monto a ahorrar mensual estimado
+        const mesesRestantes = Math.max(1, Math.ceil(diasRestantes / 30));
+        const montoAhorrarMensualEstimado = montoFaltante > 0 ? montoFaltante / mesesRestantes : 0;
 
-    // Generar consejos si hay planes activos
-    if (planesDelPerfil.length > 0) {
-      const todesConsejos = [];
-      planesDelPerfil.forEach(plan => {
-        const consejosDelPlan = mockDB.generarConsejosAhorro(plan.id);
-        todesConsejos.push(...consejosDelPlan);
+        return {
+          ...p,
+          montoActual,
+          montoMeta,
+          montoFaltante,
+          progreso,
+          diasRestantes,
+          montoAhorrarMensualEstimado,
+          historialAhorros: p.historialAhorros || [],
+          icono: p.icono || '💰',
+          color: p.color || '#4CAF50'
+        };
       });
-      setConsejos(todesConsejos.slice(0, 3)); // Mostrar max 3 consejos
-    }
 
-    setLoading(false);
+      setPlanes(planesTransformados);
+
+      // Si hay un plan seleccionado, actualizarlo con los datos frescos
+      if (selectedPlanRef.current) {
+        const planActualizado = planesTransformados.find(p => p.id === selectedPlanRef.current.id);
+        if (planActualizado) {
+          setSelectedPlan(planActualizado);
+        }
+      }
+
+      // Calcular estadísticas con los campos que espera EstadisticasAhorro
+      const planesActivos = planesTransformados.filter(p => p.estado === 'activo');
+      const planesCompletados = planesTransformados.filter(p => p.estado === 'completado');
+      const montoAhorradoTotal = planesTransformados.reduce((sum, p) => sum + p.montoActual, 0);
+      const montoMetaTotal = planesTransformados.reduce((sum, p) => sum + p.montoMeta, 0);
+      
+      const porcentajePromedioCompletitud = planesTransformados.length > 0
+        ? planesTransformados.reduce((sum, p) => sum + p.progreso, 0) / planesTransformados.length
+        : 0;
+
+      // Planes en peligro: activos con menos de 30 días y progreso bajo
+      const planesEnPeligro = planesTransformados
+        .filter(p => p.estado === 'activo' && p.diasRestantes < 30 && p.diasRestantes > 0 && p.progreso < 70);
+
+      // Próximos a completar: planes con progreso >= 70%
+      const proximosPlanesACompletar = planesTransformados
+        .filter(p => p.estado === 'activo' && p.progreso >= 70 && p.progreso < 100)
+        .sort((a, b) => b.progreso - a.progreso)
+        .slice(0, 3);
+      
+      setEstadisticas({
+        totalPlanes: planesTransformados.length,
+        planesActivos: planesActivos.length,
+        planesCompletados: planesCompletados.length,
+        montoAhorradoTotal,
+        montoMetaTotal,
+        porcentajePromedioCompletitud,
+        planesEnPeligro,
+        proximosPlanesACompletar
+      });
+
+      // Generar consejos basados en los planes
+      if (planesTransformados.length > 0) {
+        const consejosGenerados = [];
+        planesTransformados.forEach(plan => {
+          if (plan.progreso < 25) {
+            consejosGenerados.push({
+              id: `consejo-${plan.id}-1`,
+              tipo: 'motivacion',
+              mensaje: `¡Ánimo con "${plan.nombre}"! Cada pequeño aporte cuenta.`,
+              planId: plan.id
+            });
+          } else if (plan.progreso >= 75 && plan.progreso < 100) {
+            consejosGenerados.push({
+              id: `consejo-${plan.id}-2`,
+              tipo: 'felicitacion',
+              mensaje: `¡Excelente! Estás muy cerca de completar "${plan.nombre}".`,
+              planId: plan.id
+            });
+          }
+        });
+        setConsejos(consejosGenerados.slice(0, 3));
+      }
+    } catch (error) {
+      console.error('Error al cargar planes de ahorro:', error);
+      setToast({
+        type: 'error',
+        message: 'Error al cargar los planes de ahorro'
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [currentPerfil]);
 
   useEffect(() => {
     cargarDatos();
   }, [cargarDatos]);
 
-  const handleCrearPlan = (planData) => {
-    const result = mockDB.crearPlanAhorro({
-      ...planData,
-      perfilId: currentPerfil.id,
-      montoActual: 0
-    });
+  const handleCrearPlan = async (planData) => {
+    try {
+      const nuevoPlan = await apiService.planesAhorro.create(currentPerfil.id, {
+        ...planData,
+        montoActual: 0,
+        estado: 'activo'
+      });
 
-    if (result.success) {
       setToast({
         type: 'success',
-        message: `Plan "${result.plan.nombre}" creado exitosamente 🎉`
+        message: `Plan "${nuevoPlan.nombre}" creado exitosamente 🎉`
       });
       setShowModal(false);
-      cargarDatos();
-    } else {
+      await cargarDatos();
+    } catch (error) {
+      console.error('Error al crear plan:', error);
       setToast({
         type: 'error',
         message: 'Error al crear el plan'
@@ -83,18 +177,19 @@ function PlanAhorro() {
     setShowModal(true);
   };
 
-  const handleGuardarEdicion = (planData) => {
-    const result = mockDB.actualizarPlanAhorro(editingPlan.id, planData);
+  const handleGuardarEdicion = async (planData) => {
+    try {
+      await apiService.planesAhorro.update(currentPerfil.id, editingPlan.id, planData);
 
-    if (result.success) {
       setToast({
         type: 'success',
         message: 'Plan actualizado exitosamente ✓'
       });
       setShowModal(false);
       setEditingPlan(null);
-      cargarDatos();
-    } else {
+      await cargarDatos();
+    } catch (error) {
+      console.error('Error al actualizar plan:', error);
       setToast({
         type: 'error',
         message: 'Error al actualizar el plan'
@@ -102,17 +197,18 @@ function PlanAhorro() {
     }
   };
 
-  const handleEliminarPlan = (planId) => {
+  const handleEliminarPlan = async (planId) => {
     if (window.confirm('¿Estás seguro de que deseas eliminar este plan?')) {
-      const result = mockDB.eliminarPlan(planId);
+      try {
+        await apiService.planesAhorro.delete(currentPerfil.id, planId);
 
-      if (result.success) {
         setToast({
           type: 'success',
           message: 'Plan eliminado exitosamente'
         });
-        cargarDatos();
-      } else {
+        await cargarDatos();
+      } catch (error) {
+        console.error('Error al eliminar plan:', error);
         setToast({
           type: 'error',
           message: 'Error al eliminar el plan'
@@ -134,27 +230,31 @@ function PlanAhorro() {
     }, 300);
   };
 
-  const handlePausarPlan = (plan) => {
-    const result = mockDB.pausarPlan(plan.id);
+  const handlePausarPlan = async (plan) => {
+    try {
+      await apiService.planesAhorro.update(currentPerfil.id, plan.id, { estado: 'pausado' });
 
-    if (result.success) {
       setToast({
         type: 'info',
         message: 'Plan pausado'
       });
-      cargarDatos();
+      await cargarDatos();
+    } catch (error) {
+      console.error('Error al pausar plan:', error);
     }
   };
 
-  const handleReactivarPlan = (plan) => {
-    const result = mockDB.reactivarPlan(plan.id);
+  const handleReactivarPlan = async (plan) => {
+    try {
+      await apiService.planesAhorro.update(currentPerfil.id, plan.id, { estado: 'activo' });
 
-    if (result.success) {
       setToast({
         type: 'success',
         message: 'Plan reactivado'
       });
-      cargarDatos();
+      await cargarDatos();
+    } catch (error) {
+      console.error('Error al reactivar plan:', error);
     }
   };
 
@@ -166,7 +266,7 @@ function PlanAhorro() {
     return true;
   });
 
-  const simboloMoneda = currentPerfil?.simboloMoneda || '$';
+  const simboloMoneda = currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$';
 
   if (loading) {
     return <div className={styles.loading}>Cargando planes de ahorro...</div>;

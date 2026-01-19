@@ -5,7 +5,7 @@ import Sidebar from '../../../components/layout/Sidebar';
 import AdminSummaryCards from '../../../components/dashboard/AdminSummaryCards';
 import UserGrowthChart from '../../../components/dashboard/UserGrowthChart';
 import { adminSidebarMenuItems, adminDropdownMenuItems } from '../../../config/adminSidebarConfig';
-import mockDB from '../../../utils/mockDatabase';
+import apiService from '../../../services/apiService';
 import styles from './DashboardAdmin.module.css';
 
 /**
@@ -32,35 +32,37 @@ function DashboardAdmin() {
 
   // Cargar estadísticas
   useEffect(() => {
-    const loadStats = () => {
-      // Obtener todos los usuarios
-      const allUsers = mockDB.users || [];
-      
-      // Calcular estadísticas
-      const usuariosActivos = allUsers.filter(u => u.activo !== false).length;
-      const cuentasCreadas = allUsers.length;
-      
-      // Obtener reportes (puedes ajustar esto según tu modelo de datos)
-      const reportes = mockDB.securityLogs?.filter(log => 
-        log.eventCategory === 'SOPORTE' || log.eventType.includes('REPORT')
-      ).length || 12;
+    const loadStats = async () => {
+      try {
+        // Obtener todos los usuarios del backend
+        const allUsers = await apiService.users.getAll();
+        
+        // Calcular estadísticas
+        const usuariosActivos = allUsers.filter(u => u.activo !== false).length;
+        const cuentasCreadas = allUsers.length;
+        
+        // Reportes (ejemplo fijo por ahora)
+        const reportes = 12;
 
-      setStats({
-        usuariosActivos,
-        cuentasCreadas,
-        reportes
-      });
+        setStats({
+          usuariosActivos,
+          cuentasCreadas,
+          reportes
+        });
 
-      // Generar datos de crecimiento (esto es un ejemplo, ajusta según tu lógica)
-      const growthData = [
-        { mes: 'Ene', usuarios: 125 },
-        { mes: 'Feb', usuarios: 150 },
-        { mes: 'Mar', usuarios: 210 },
-        { mes: 'Abr', usuarios: 250 },
-        { mes: 'May', usuarios: 325 },
-        { mes: 'Jun', usuarios: 400 }
-      ];
-      setUserGrowthData(growthData);
+        // Generar datos de crecimiento (ejemplo)
+        const growthData = [
+          { mes: 'Ene', usuarios: 125 },
+          { mes: 'Feb', usuarios: 150 },
+          { mes: 'Mar', usuarios: 210 },
+          { mes: 'Abr', usuarios: 250 },
+          { mes: 'May', usuarios: 325 },
+          { mes: 'Jun', usuarios: 400 }
+        ];
+        setUserGrowthData(growthData);
+      } catch (error) {
+        console.error('Error cargando estadísticas:', error);
+      }
     };
 
     if (currentUser && isAdmin) {

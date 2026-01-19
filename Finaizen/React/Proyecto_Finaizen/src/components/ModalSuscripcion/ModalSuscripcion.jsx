@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import styles from './ModalSuscripcion.module.css';
-import mockDB from '../../utils/mockDatabase';
+import apiService from '../../services/apiService';
 
 /**
  * Modal de Suscripción Premium
@@ -88,46 +88,30 @@ export default function ModalSuscripcion({ isOpen, onClose, currentUser, onSucce
     setError('');
 
     // Simular procesamiento de pago
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
-        // Actualizar usuario a premium
-        const user = mockDB.users.find(u => u.id === currentUser.id);
-        if (user) {
-          user.activarPremium(plan, {
+        // Actualizar usuario a premium en el backend
+        await apiService.auth.activarPremium({
+          plan,
+          metodoPago: {
             type: 'tarjeta',
             brand: detectCardBrand(formData.cardNumber),
             last4: formData.cardNumber.replace(/\s/g, '').slice(-4),
             expiry: formData.expiry,
             holderName: formData.cardName
-          });
-          mockDB.saveToLocalStorage();
+          }
+        });
 
-          // Crear notificación de bienvenida
-          const perfil = mockDB.getPerfilesDeUsuario(currentUser.id)[0];
-          mockDB.notificaciones.push({
-            id: Date.now(),
-            userId: currentUser.id,
-            perfilId: perfil?.id,
-            tipo: 'success',
-            titulo: '✨ ¡Bienvenido a Finaizen Premium!',
-            mensaje: `¡Felicitaciones! Ahora tienes acceso al ChatBot con IA y funciones exclusivas. Tu suscripción ${plan === 'mensual' ? 'mensual' : 'anual'} está activa.`,
-            icono: '👑',
-            leida: false,
-            createdAt: new Date().toISOString(),
-            data: { tipo: 'premium_activado' }
-          });
-          mockDB.saveToLocalStorage();
-
-          setIsProcessing(false);
-          if (onSuccess) onSuccess();
-          onClose();
-          
-          // Recargar página para mostrar cambios
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-        }
+        setIsProcessing(false);
+        if (onSuccess) onSuccess();
+        onClose();
+        
+        // Recargar página para mostrar cambios
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       } catch (err) {
+        console.error('Error al activar premium:', err);
         setError('Error al procesar el pago. Intenta nuevamente.');
         setIsProcessing(false);
       }

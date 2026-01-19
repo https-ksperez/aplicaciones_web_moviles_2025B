@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import mockDB from '../../../utils/mockDatabase';
+import apiService from '../../../services/apiService';
 import { Toast } from '../../../components/ui';
 import { StatsCards, ChartsSection, PresupuestosSection, TransaccionesRecientes } from '../../../components/dashboard';
 import NotificationBell from '../../../components/NotificationBell';
@@ -34,84 +34,114 @@ function DashboardUser() {
     ahorro: 0
   });
 
-  const cargarDatos = useCallback(() => {
+  const cargarDatos = useCallback(async () => {
     if (!currentPerfil) return;
     
     setLoading(true);
 
-    mockDB.getIngresosDePerf(currentPerfil.id);
-    mockDB.getEgresosDePerf(currentPerfil.id);
-    const hist = mockDB.getHistorialDePerfil(currentPerfil.id);
-    const pres = mockDB.getPresupuestosDePerfil(currentPerfil.id);
-    const logr = mockDB.getLogrosDePerfil(currentPerfil.id);
+    try {
+      console.log('🔄 Cargando datos desde backend...');
 
-    setHistorial(hist);
-    setLogros(logr);
+      // Cargar datos desde el backend
+      const [historialData, presupuestosData, logrosData] = await Promise.all([
+        apiService.historial.getAll(currentPerfil.id),
+        apiService.presupuestos.getAll(currentPerfil.id),
+        apiService.logros.getAll(currentPerfil.id)
+      ]);
 
-    // Calcular estadísticas del mes actual
-    const now = new Date();
-    const mesActual = now.getMonth() + 1;
-    const anioActual = now.getFullYear();
+      console.log('✅ Historial cargado:', historialData.length, 'registros');
+      console.log('📋 Historial completo:', historialData);
+      console.log('✅ Presupuestos cargados:', presupuestosData.length);
+      console.log('✅ Logros cargados:', logrosData.length);
 
-    // Filtrar presupuestos del mes actual
-    const presupuestosMesActual = pres.filter(p => 
-      p.mes === mesActual && p.anio === anioActual && p.activo
-    );
+      setHistorial(historialData);
+      setLogros(logrosData);
 
-    // Calcular gasto real por categoría del mes actual
-    const presupuestosConGastoReal = presupuestosMesActual.map(presupuesto => {
-      // Obtener egresos del mes actual para esta categoría
-      const gastosCategoria = hist.filter(h => 
-        h.tipo === 'egreso' &&
-        h.categoria === presupuesto.categoria &&
-        h.mes === mesActual &&
-        h.anio === anioActual
+      // Calcular estadísticas del mes actual
+      const now = new Date();
+      const mesActual = now.getMonth() + 1;
+      const anioActual = now.getFullYear();
+
+      // Filtrar presupuestos del mes actual
+      const presupuestosMesActual = presupuestosData.filter(p => 
+        p.mes === mesActual && p.anio === anioActual && p.activo
       );
 
-      const montoGastadoReal = gastosCategoria.reduce((sum, h) => sum + h.monto, 0);
+      // Calcular gasto real por categoría del mes actual
+      const presupuestosConGastoReal = presupuestosMesActual.map(presupuesto => {
+        // Obtener egresos del mes actual para esta categoría
+        const gastosCategoria = historialData.filter(h => 
+          h.tipo === 'egreso' &&
+          h.categoria === presupuesto.categoria &&
+          h.mes === mesActual &&
+          h.anio === anioActual
+        );
 
-      // Crear un nuevo objeto con el gasto real calculado
-      return {
-        ...presupuesto,
-        montoGastado: montoGastadoReal,
-        porcentajeGastado: presupuesto.montoLimite > 0 
-          ? (montoGastadoReal / presupuesto.montoLimite) * 100 
-          : 0,
-        estado: (() => {
-          const porcentaje = presupuesto.montoLimite > 0 
-            ? (montoGastadoReal / presupuesto.montoLimite) * 100 
-            : 0;
-          if (porcentaje >= 100) return 'danger';
-          if (porcentaje >= presupuesto.alertaEn) return 'warning';
-          if (porcentaje >= 50) return 'neutral';
-          return 'ok';
-        })()
-      };
-    });
+        const montoGastadoReal = gastosCategoria.reduce((sum, h) => sum + parseFloat(h.monto || 0), 0);
+        const montoLimiteNum = parseFloat(presupuesto.montoLimite || 0);
+        const alertaEnNum = parseInt(presupuesto.alertaEn || 80, 10);
 
-    setPresupuestos(presupuestosConGastoReal);
+        // Crear un nuevo objeto con el gasto real calculado
+        return {
+          ...presupuesto,
+          montoLimite: montoLimiteNum,
+          montoGastado: montoGastadoReal,
+          porcentajeGastado: montoLimiteNum > 0 
+            ? (montoGastadoReal / montoLimiteNum) * 100 
+            : 0,
+          estado: (() => {
+            const porcentaje = montoLimiteNum > 0 
+              ? (montoGastadoReal / montoLimiteNum) * 100 
+              : 0;
+            if (porcentaje >= 100) return 'danger';
+            if (porcentaje >= alertaEnNum) return 'warning';
+            if (porcentaje >= 50) return 'neutral';
+            return 'ok';
+          })()
+        };
+      });
 
-    const historialMes = hist.filter(h => h.mes === mesActual && h.anio === anioActual);
-    
-    const totalIngresos = historialMes
-      .filter(h => h.tipo === 'ingreso')
-      .reduce((sum, h) => sum + h.monto, 0);
-    
-    const totalEgresos = historialMes
-      .filter(h => h.tipo === 'egreso')
-      .reduce((sum, h) => sum + h.monto, 0);
+      setPresupuestos(presupuestosConGastoReal);
 
-    const balance = totalIngresos - totalEgresos;
-    const ahorro = balance > 0 ? (balance / totalIngresos) * 100 : 0;
+      const historialMes = historialData.filter(h => h.mes === mesActual && h.anio === anioActual);
+      
+      console.log(`📅 Filtrando por mes ${mesActual}/${anioActual}`);
+      console.log('📊 Registros del mes actual:', historialMes);
+      
+      const totalIngresos = historialMes
+        .filter(h => h.tipo === 'ingreso')
+        .reduce((sum, h) => sum + parseFloat(h.monto || 0), 0);
+      
+      const totalEgresos = historialMes
+        .filter(h => h.tipo === 'egreso')
+        .reduce((sum, h) => sum + parseFloat(h.monto || 0), 0);
 
-    setStats({
-      totalIngresos,
-      totalEgresos,
-      balance,
-      ahorro: ahorro.toFixed(1)
-    });
+      const balance = totalIngresos - totalEgresos;
+      const ahorro = balance > 0 ? (balance / totalIngresos) * 100 : 0;
 
-    setLoading(false);
+      setStats({
+        totalIngresos,
+        totalEgresos,
+        balance,
+        ahorro: ahorro.toFixed(1)
+      });
+
+      console.log('📊 Estadísticas calculadas:', {
+        totalIngresos,
+        totalEgresos,
+        balance,
+        ahorro: ahorro.toFixed(1)
+      });
+
+    } catch (error) {
+      console.error('❌ Error al cargar datos:', error);
+      setToast({
+        type: 'error',
+        message: 'Error al cargar los datos del dashboard'
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [currentPerfil]);
 
   // Cargar datos al montar el componente
@@ -174,11 +204,11 @@ function DashboardUser() {
       
       const ingresos = registrosMes
         .filter(h => h.tipo === 'ingreso')
-        .reduce((sum, h) => sum + h.monto, 0);
+        .reduce((sum, h) => sum + parseFloat(h.monto || 0), 0);
       
       const egresos = registrosMes
         .filter(h => h.tipo === 'egreso')
-        .reduce((sum, h) => sum + h.monto, 0);
+        .reduce((sum, h) => sum + parseFloat(h.monto || 0), 0);
       
       const balance = ingresos - egresos;
       
@@ -198,7 +228,7 @@ function DashboardUser() {
   const logrosDesbloqueados = logros.filter(l => l.desbloqueado).length;
 
   // Items adicionales para el FAB
-  const fabMenuItems = currentUser?.premiumActivo ? [
+  const fabMenuItems = currentUser?.isPremium ? [
     { icon: '🤖', label: 'ChatBot IA', action: () => setShowChatBot(true), isPremium: true },
     { icon: '💰', label: 'Nuevo Ingreso', path: '/user/nuevo-ingreso' },
     { icon: '💸', label: 'Nuevo Egreso', path: '/user/nuevo-egreso' },
@@ -225,7 +255,7 @@ function DashboardUser() {
           <div className={styles.welcomeSection}>
             <h1>
               ¡Hola, {currentUser?.nombre || 'Usuario'}! 👋
-              {currentUser?.premiumActivo && (
+              {currentUser?.isPremium && (
                 <span className={styles.premiumBadge}>
                   <span className={styles.premiumIcon}>✨</span>
                   <span className={styles.premiumText}>PREMIUM</span>
@@ -233,7 +263,7 @@ function DashboardUser() {
                 </span>
               )}
             </h1>
-            <p>Perfil: <strong>{currentPerfil?.nombre || 'Cargando'}</strong> ({currentPerfil?.moneda || ''})</p>
+            <p>Perfil: <strong>{currentPerfil?.nombre || 'Cargando'}</strong> ({currentPerfil?.moneda?.codigo || ''})</p>
           </div>
           {/* Campanita de Notificaciones */}
           <NotificationBell 
@@ -244,7 +274,7 @@ function DashboardUser() {
         {/* Stats Cards */}
         <StatsCards 
           stats={stats}
-          simboloMoneda={currentPerfil.simboloMoneda}
+          simboloMoneda={currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$'}
           logrosDesbloqueados={logrosDesbloqueados}
           totalLogros={logros.length}
         />
@@ -261,7 +291,7 @@ function DashboardUser() {
           <div className={styles.leftColumn}>
             <PresupuestosSection 
               presupuestos={presupuestos}
-              simboloMoneda={currentPerfil.simboloMoneda}
+              simboloMoneda={currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$'}
             />
           </div>
 
@@ -269,7 +299,7 @@ function DashboardUser() {
           <div className={styles.rightColumn}>
             <TransaccionesRecientes 
               historial={historial}
-              simboloMoneda={currentPerfil.simboloMoneda}
+              simboloMoneda={currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$'}
               maxItems={8}
             />
           </div>

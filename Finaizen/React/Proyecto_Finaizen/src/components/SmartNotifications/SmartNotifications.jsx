@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SmartMessageGenerator } from '../../utils/smartMessages';
-import mockDB from '../../utils/mockDatabase';
+import apiService from '../../services/apiService';
 import styles from './SmartNotifications.module.css';
 
 /**
@@ -13,38 +13,36 @@ export default function SmartNotifications({ userId, perfilId }) {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    generateContextualMessages();
+    if (perfilId) {
+      generateContextualMessages();
+    }
     
     // Rotar mensajes cada 8 segundos
     const interval = setInterval(() => {
-      setCurrentMessageIndex(prev => (prev + 1) % messages.length);
+      if (messages.length > 0) {
+        setCurrentMessageIndex(prev => (prev + 1) % messages.length);
+      }
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [userId, perfilId]);
+  }, [userId, perfilId, messages.length]);
 
-  const generateContextualMessages = () => {
+  const generateContextualMessages = async () => {
     try {
-      // Obtener datos del usuario
-      const perfil = mockDB.getPerfilById(perfilId);
-      if (!perfil) return;
-
-      const ingresos = mockDB.getIngresosDelPerfil(perfilId);
-      const egresos = mockDB.getEgresosDelPerfil(perfilId);
-      const logros = mockDB.getLogrosDelPerfil(perfilId);
-      const presupuestos = mockDB.getPresupuestosDelPerfil(perfilId);
+      // Obtener datos del backend
+      const [historial, logros, presupuestos] = await Promise.all([
+        apiService.historial.getAll(perfilId),
+        apiService.logros.getAll(perfilId),
+        apiService.presupuestos.getAll(perfilId)
+      ]);
 
       // Calcular métricas
-      const totalIngresos = ingresos.reduce((sum, i) => sum + i.monto, 0);
-      const totalEgresos = egresos.reduce((sum, e) => sum + e.monto, 0);
+      const ingresos = historial.filter(h => h.tipo === 'ingreso');
+      const egresos = historial.filter(h => h.tipo === 'egreso');
+      const totalIngresos = ingresos.reduce((sum, i) => sum + parseFloat(i.monto || 0), 0);
+      const totalEgresos = egresos.reduce((sum, e) => sum + parseFloat(e.monto || 0), 0);
       const balanceActual = totalIngresos - totalEgresos;
       const porcentajeGastado = totalIngresos > 0 ? (totalEgresos / totalIngresos * 100) : 0;
-
-      const userData = {
-        balance: balanceActual,
-        totalGastos: totalEgresos,
-        porcentajeGastado
-      };
 
       // Analizar gastos por categoría
       const gastosPorCategoria = {};
@@ -52,26 +50,15 @@ export default function SmartNotifications({ userId, perfilId }) {
         if (!gastosPorCategoria[egreso.categoria]) {
           gastosPorCategoria[egreso.categoria] = 0;
         }
-        gastosPorCategoria[egreso.categoria] += egreso.monto;
+        gastosPorCategoria[egreso.categoria] += parseFloat(egreso.monto || 0);
       });
 
       const generatedMessages = [];
 
       // 1. MENSAJE DE BIENVENIDA SEGÚN HORA
-      const hora = new Date().getHours();
-      if (hora >= 6 && hora < 12) {
-        generatedMessages.push(SmartMessageGenerator.generateMessage({ 
-          tipo: 'contextual_tiempo' 
-        }));
-      } else if (hora >= 12 && hora < 18) {
-        generatedMessages.push(SmartMessageGenerator.generateMessage({ 
-          tipo: 'contextual_tiempo' 
-        }));
-      } else {
-        generatedMessages.push(SmartMessageGenerator.generateMessage({ 
-          tipo: 'contextual_tiempo' 
-        }));
-      }
+      generatedMessages.push(SmartMessageGenerator.generateMessage({ 
+        tipo: 'contextual_tiempo' 
+      }));
 
       // 2. ALERTAS DE GASTOS EXCESIVOS (si aplica)
       if (porcentajeGastado > 80) {
@@ -83,17 +70,19 @@ export default function SmartNotifications({ userId, perfilId }) {
       }
 
       // 3. ALERTAS POR CATEGORÍA (si alguna supera el 30% del total)
-      Object.keys(gastosPorCategoria).forEach(categoria => {
-        const porcentajeCategoria = (gastosPorCategoria[categoria] / totalEgresos) * 100;
-        if (porcentajeCategoria > 30) {
-          generatedMessages.push(SmartMessageGenerator.generateMessage({
-            tipo: 'alerta_gasto',
-            categoria: categoria,
-            monto: gastosPorCategoria[categoria],
-            porcentaje: porcentajeCategoria
-          }));
-        }
-      });
+      if (totalEgresos > 0) {
+        Object.keys(gastosPorCategoria).forEach(categoria => {
+          const porcentajeCategoria = (gastosPorCategoria[categoria] / totalEgresos) * 100;
+          if (porcentajeCategoria > 30) {
+            generatedMessages.push(SmartMessageGenerator.generateMessage({
+              tipo: 'alerta_gasto',
+              categoria: categoria,
+              monto: gastosPorCategoria[categoria],
+              porcentaje: porcentajeCategoria
+            }));
+          }
+        });
+      }
 
       // 4. SUGERENCIAS DE AHORRO (si el balance es positivo pero bajo)
       if (balanceActual > 0 && balanceActual < totalIngresos * 0.2) {

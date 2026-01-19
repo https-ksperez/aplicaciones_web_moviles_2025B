@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { useAuth } from '../../../context/AuthContext';
-import mockDB from '../../../utils/mockDatabase';
+import apiService from '../../../services/apiService';
 import { Ingreso, Egreso, RegistroHistorial, CATEGORIAS_INGRESO, CATEGORIAS_EGRESO } from '../../../models';
 import { Button, Toast } from '../../ui';
 import styles from './TransactionForm.module.css';
@@ -58,6 +58,7 @@ function TransactionForm({ type = 'ingreso', onSubmitSuccess }) {
     diasSemana: [],
     diaMes: null,
     fechaEspecifica: currentDate,
+    fechaLimite: '', // Fecha hasta la cual la transacción recurrente estará activa
     hora: getDefaultTime().split(':')[0],
     minutos: getDefaultTime().split(':')[1],
     notificacionActiva: false,
@@ -83,27 +84,38 @@ function TransactionForm({ type = 'ingreso', onSubmitSuccess }) {
   // useEffect: Cargar datos en modo edición
   useEffect(() => {
     if (isEditMode && editId && currentPerfil) {
-      // Buscar el registro a editar
-      const record = type === 'ingreso' 
-        ? mockDB.ingresos.find(i => i.id === parseInt(editId))
-        : mockDB.egresos.find(e => e.id === parseInt(editId));
+      const loadRecord = async () => {
+        try {
+          // Buscar el registro a editar en el backend
+          const record = type === 'ingreso' 
+            ? await apiService.ingresos.getById(currentPerfil.id, editId)
+            : await apiService.egresos.getById(currentPerfil.id, editId);
 
-      if (record) {
-        // Cargar datos del registro en el formulario
-        setFormData({
-          monto: record.monto.toFixed(2),
-          descripcion: record.descripcion,
-          categoria: record.categoria,
-          frecuencia: record.frecuencia,
-          diasSemana: record.diasSemana || [],
-          diaMes: record.diaMes || null,
-          fechaEspecifica: record.fechaEspecifica || currentDate,
-          hora: record.hora?.toString().padStart(2, '0') || getDefaultTime().split(':')[0],
-          minutos: record.minutos?.toString().padStart(2, '0') || getDefaultTime().split(':')[1],
-          notificacionActiva: record.notificacionActiva || false,
-          clasificacion: record.clasificacionIA || 'prioritario'
-        });
-      }
+          if (record) {
+            // Cargar datos del registro en el formulario
+            setFormData({
+              monto: parseFloat(record.monto || 0).toFixed(2),
+              descripcion: record.descripcion,
+              categoria: record.categoria,
+              frecuencia: record.frecuencia,
+              diasSemana: record.diasSemana || [],
+              diaMes: record.diaMes || null,
+              fechaEspecifica: record.fechaEspecifica || currentDate,
+              hora: record.hora?.toString().padStart(2, '0') || getDefaultTime().split(':')[0],
+              minutos: record.minutos?.toString().padStart(2, '0') || getDefaultTime().split(':')[1],
+              notificacionActiva: record.notificacionActiva || false,
+              clasificacion: record.clasificacionIA || 'prioritario'
+            });
+          }
+        } catch (error) {
+          console.error('Error al cargar registro:', error);
+          setToast({
+            type: 'error',
+            message: 'Error al cargar el registro'
+          });
+        }
+      };
+      loadRecord();
     }
   }, [isEditMode, editId, type, currentPerfil, currentDate, getDefaultTime]);
 
@@ -323,7 +335,7 @@ function TransactionForm({ type = 'ingreso', onSubmitSuccess }) {
     try {
       if (isEditMode && editId) {
         // MODO EDICIÓN: Actualizar registro existente
-        updateTransaction(parseInt(editId));
+        updateTransaction(editId);
       } else {
         // MODO CREACIÓN: Crear nuevo registro
         createTransaction();
@@ -354,190 +366,164 @@ function TransactionForm({ type = 'ingreso', onSubmitSuccess }) {
   /**
    * Crear transacción ocasional (directa al historial)
    */
-  const createOcasionalTransaction = () => {
-    // Generar ID único para el registro de historial
-    const historialId = mockDB.historial.length > 0 
-      ? Math.max(...mockDB.historial.map(t => t.id)) + 1 
-      : 1;
+  const createOcasionalTransaction = async () => {
+    try {
+      // Crear registro directamente en historial
+      const [year, month, day] = formData.fechaEspecifica.split('-').map(Number);
+      const fechaEjecucion = new Date(year, month - 1, day);
+      
+      const registroData = {
+        tipo: type,
+        monto: parseFloat(formData.monto),
+        descripcion: formData.descripcion,
+        categoria: formData.categoria,
+        transaccionOrigenId: null,
+        fechaEjecucion: fechaEjecucion.toISOString(),
+        mes: fechaEjecucion.getMonth() + 1,
+        anio: fechaEjecucion.getFullYear()
+      };
 
-    // Crear registro directamente en historial
-    const [year, month, day] = formData.fechaEspecifica.split('-').map(Number);
-    const fechaEjecucion = new Date(year, month - 1, day);
-    
-    const registroHistorial = new RegistroHistorial({
-      id: historialId,
-      perfilId: currentPerfil.id,
-      tipo: type,
-      monto: parseFloat(formData.monto),
-      descripcion: formData.descripcion,
-      categoria: formData.categoria,
-      transaccionOrigenId: null, // No tiene origen porque es ocasional
-      fechaEjecucion: fechaEjecucion,
-      mes: fechaEjecucion.getMonth() + 1,
-      anio: fechaEjecucion.getFullYear()
-    });
+      console.log('💾 Guardando transacción ocasional:', registroData);
+      console.log('📅 Fecha:', formData.fechaEspecifica);
+      console.log('📆 Mes/Año calculado:', registroData.mes, '/', registroData.anio);
 
-    // Agregar a historial
-    mockDB.historial.push(registroHistorial);
+      // Crear en backend
+      const registroHistorial = await apiService.historial.create(currentPerfil.id, registroData);
 
-    // Agregar al perfil (si el método existe)
-    if (currentPerfil.agregarTransaccion) {
-      currentPerfil.agregarTransaccion(registroHistorial.id);
-    }
+      console.log('=== TRANSACCIÓN OCASIONAL REGISTRADA ===');
+      console.log('Tipo:', type);
+      console.log('Registro en historial:', registroHistorial);
 
-    // Guardar en localStorage
-    mockDB.saveToLocalStorage();
-
-    console.log('=== TRANSACCIÓN OCASIONAL REGISTRADA ===');
-    console.log('Tipo:', type);
-    console.log('Registro en historial:', registroHistorial);
-    console.log('Total transacciones en historial:', mockDB.historial.length);
-
-    // Callback para el componente padre
-    if (onSubmitSuccess) {
-      onSubmitSuccess(registroHistorial);
-    }
-
-    // Redirigir al dashboard con notificación
-    navigate('/user/dashboard', {
-      state: {
-        notification: {
-          type: 'success',
-          message: `✓ ${type === 'ingreso' ? 'Ingreso' : 'Egreso'} ocasional registrado en historial`
-        }
+      // Callback para el componente padre
+      if (onSubmitSuccess) {
+        onSubmitSuccess(registroHistorial);
       }
-    });
+
+      // Redirigir al dashboard con notificación
+      navigate('/user/dashboard', {
+        state: {
+          notification: {
+            type: 'success',
+            message: `✓ ${type === 'ingreso' ? 'Ingreso' : 'Egreso'} ocasional registrado en historial`
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error al crear transacción ocasional:', error);
+      setToast({
+        type: 'error',
+        message: 'Error al registrar la transacción'
+      });
+    }
   };
 
   /**
    * Crear transacción recurrente (en ingresos/egresos)
    */
-  const createRecurringTransaction = () => {
-    // Preparar datos para el modelo
-    const transactionData = {
-      id: type === 'ingreso' 
-        ? (mockDB.ingresos.length > 0 ? Math.max(...mockDB.ingresos.map(i => i.id)) + 1 : 1)
-        : (mockDB.egresos.length > 0 ? Math.max(...mockDB.egresos.map(e => e.id)) + 1 : 1),
-      perfilId: currentPerfil.id,
-      monto: parseFloat(formData.monto),
-      descripcion: formData.descripcion,
-      categoria: formData.categoria,
-      frecuencia: formData.frecuencia,
-      diasSemana: formData.diasSemana,
-      diaMes: formData.diaMes,
-      fechaEspecifica: formData.fechaEspecifica || null,
-      delay: `${formData.hora}:${formData.minutos}`,
-      notificacionActiva: formData.notificacionActiva
-    };
+  const createRecurringTransaction = async () => {
+    try {
+      // Preparar datos para el backend
+      const transactionData = {
+        perfilId: currentPerfil.id,
+        monto: parseFloat(formData.monto),
+        descripcion: formData.descripcion,
+        categoria: formData.categoria,
+        frecuencia: formData.frecuencia,
+        diasSemana: formData.diasSemana,
+        diaMes: formData.diaMes,
+        fechaEspecifica: formData.fechaEspecifica || null,
+        fechaLimite: formData.fechaLimite || null,
+        delay: `${formData.hora}:${formData.minutos}`,
+        notificacionActiva: formData.notificacionActiva
+      };
 
-    // Crear instancia del modelo
-    let transaction;
-    if (type === 'ingreso') {
-      transaction = new Ingreso(transactionData);
-      mockDB.ingresos.push(transaction);
-      currentPerfil.agregarIngreso(transaction.id);
-      
-      // Guardar en localStorage
-      mockDB.saveToLocalStorage();
-      
-      // Imprimir lista actualizada de ingresos
-      console.log('=== LISTA DE INGRESOS ACTUALIZADA ===');
-      console.log('Total de ingresos:', mockDB.ingresos.length);
-      console.log('Ingresos registrados:', mockDB.ingresos);
-      console.log('Nuevo ingreso agregado:', transaction);
-    } else {
-      transaction = new Egreso({
-        ...transactionData,
-        clasificacionIA: formData.clasificacion
-      });
-      mockDB.egresos.push(transaction);
-      currentPerfil.agregarEgreso(transaction.id);
-      
-      // Guardar en localStorage
-      mockDB.saveToLocalStorage();
-      
-      // Imprimir lista actualizada de egresos
-      console.log('=== LISTA DE EGRESOS ACTUALIZADA ===');
-      console.log('Total de egresos:', mockDB.egresos.length);
-      console.log('Egresos registrados:', mockDB.egresos);
-      console.log('Nuevo egreso agregado:', transaction);
-    }
-
-    // Callback para el componente padre (lifting state up)
-    if (onSubmitSuccess) {
-      onSubmitSuccess(transaction);
-    }
-
-    // Redirigir al dashboard inmediatamente con mensaje de notificación
-    navigate('/user/dashboard', {
-      state: {
-        notification: {
-          type: 'success',
-          message: `✓ ${type === 'ingreso' ? 'Ingreso' : 'Egreso'} recurrente registrado exitosamente`
-        }
+      // Crear en backend
+      let transaction;
+      if (type === 'ingreso') {
+        transaction = await apiService.ingresos.create(currentPerfil.id, transactionData);
+        console.log('=== INGRESO REGISTRADO ===');
+        console.log('Nuevo ingreso:', transaction);
+      } else {
+        transaction = await apiService.egresos.create(currentPerfil.id, {
+          ...transactionData,
+          clasificacionIA: formData.clasificacion
+        });
+        console.log('=== EGRESO REGISTRADO ===');
+        console.log('Nuevo egreso:', transaction);
       }
-    });
+
+      // Callback para el componente padre (lifting state up)
+      if (onSubmitSuccess) {
+        onSubmitSuccess(transaction);
+      }
+
+      // Redirigir al dashboard inmediatamente con mensaje de notificación
+      navigate('/user/dashboard', {
+        state: {
+          notification: {
+            type: 'success',
+            message: `✓ ${type === 'ingreso' ? 'Ingreso' : 'Egreso'} recurrente registrado exitosamente`
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error al crear transacción recurrente:', error);
+      setToast({
+        type: 'error',
+        message: 'Error al registrar la transacción'
+      });
+    }
   };
 
   /**
    * Actualizar transacción existente
    */
-  const updateTransaction = (id) => {
-    // Buscar el registro
-    const recordIndex = type === 'ingreso'
-      ? mockDB.ingresos.findIndex(i => i.id === id)
-      : mockDB.egresos.findIndex(e => e.id === id);
+  const updateTransaction = async (id) => {
+    try {
+      // Actualizar datos del registro
+      const updatedData = {
+        monto: parseFloat(formData.monto),
+        descripcion: formData.descripcion,
+        categoria: formData.categoria,
+        frecuencia: formData.frecuencia,
+        diasSemana: formData.diasSemana,
+        diaMes: formData.diaMes,
+        fechaEspecifica: formData.fechaEspecifica || null,
+        delay: `${formData.hora}:${formData.minutos}`,
+        hora: parseInt(formData.hora),
+        minutos: parseInt(formData.minutos),
+        notificacionActiva: formData.notificacionActiva
+      };
 
-    if (recordIndex === -1) {
+      if (type === 'ingreso') {
+        // Actualizar ingreso
+        await apiService.ingresos.update(currentPerfil.id, id, updatedData);
+        console.log('=== INGRESO ACTUALIZADO ===');
+      } else {
+        // Actualizar egreso
+        await apiService.egresos.update(currentPerfil.id, id, {
+          ...updatedData,
+          clasificacionIA: formData.clasificacion
+        });
+        console.log('=== EGRESO ACTUALIZADO ===');
+      }
+
+      // Redirigir al administrador de registros con notificación
+      navigate('/user/administrar-registros', {
+        state: {
+          notification: {
+            type: 'success',
+            message: `✓ ${type === 'ingreso' ? 'Ingreso' : 'Egreso'} actualizado exitosamente`
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error al actualizar:', error);
       setToast({
         type: 'error',
-        message: 'Registro no encontrado'
+        message: 'Error al actualizar el registro'
       });
-      return;
     }
-
-    // Actualizar datos del registro
-    const updatedData = {
-      monto: parseFloat(formData.monto),
-      descripcion: formData.descripcion,
-      categoria: formData.categoria,
-      frecuencia: formData.frecuencia,
-      diasSemana: formData.diasSemana,
-      diaMes: formData.diaMes,
-      fechaEspecifica: formData.fechaEspecifica || null,
-      delay: `${formData.hora}:${formData.minutos}`,
-      hora: parseInt(formData.hora),
-      minutos: parseInt(formData.minutos),
-      notificacionActiva: formData.notificacionActiva
-    };
-
-    if (type === 'ingreso') {
-      // Actualizar ingreso
-      Object.assign(mockDB.ingresos[recordIndex], updatedData);
-      console.log('=== INGRESO ACTUALIZADO ===');
-      console.log('Ingreso modificado:', mockDB.ingresos[recordIndex]);
-    } else {
-      // Actualizar egreso
-      Object.assign(mockDB.egresos[recordIndex], {
-        ...updatedData,
-        clasificacionIA: formData.clasificacion
-      });
-      console.log('=== EGRESO ACTUALIZADO ===');
-      console.log('Egreso modificado:', mockDB.egresos[recordIndex]);
-    }
-
-    // Guardar en localStorage
-    mockDB.saveToLocalStorage();
-
-    // Redirigir al administrador de registros con notificación
-    navigate('/user/administrar-registros', {
-      state: {
-        notification: {
-          type: 'success',
-          message: `✓ ${type === 'ingreso' ? 'Ingreso' : 'Egreso'} actualizado exitosamente`
-        }
-      }
-    });
   };
 
   // Array de días de la semana
@@ -802,17 +788,38 @@ function TransactionForm({ type = 'ingreso', onSubmitSuccess }) {
 
           {/* Notificación (solo si NO es ocasional) */}
           {formData.frecuencia !== 'ocasional' && (
-            <div className={styles.notificationGroup}>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  name="notificacionActiva"
-                  checked={formData.notificacionActiva}
-                  onChange={handleInputChange}
-                />
-                <span>Activar notificación</span>
-              </label>
-            </div>
+            <>
+              {/* Fecha límite - hasta cuándo estará activa la transacción recurrente */}
+              <div className={styles.formGroup}>
+                <label htmlFor="fechaLimite">Fecha límite (opcional):</label>
+                <div className={styles.inputWrapper}>
+                  <input
+                    type="date"
+                    id="fechaLimite"
+                    name="fechaLimite"
+                    value={formData.fechaLimite}
+                    onChange={handleInputChange}
+                    min={currentDate}
+                    placeholder="Sin fecha límite"
+                  />
+                </div>
+                <span className={styles.helpText}>
+                  Deja vacío para que la transacción se repita indefinidamente
+                </span>
+              </div>
+
+              <div className={styles.notificationGroup}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    name="notificacionActiva"
+                    checked={formData.notificacionActiva}
+                    onChange={handleInputChange}
+                  />
+                  <span>Activar notificación</span>
+                </label>
+              </div>
+            </>
           )}
 
           {/* Botones de acción */}

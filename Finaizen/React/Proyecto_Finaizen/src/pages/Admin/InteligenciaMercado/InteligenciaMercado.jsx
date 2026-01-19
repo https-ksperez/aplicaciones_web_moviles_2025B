@@ -8,23 +8,26 @@ import TopCategoriesChart from '../../../components/market/TopCategoriesChart';
 import IncomeSourceChart from '../../../components/market/IncomeSourceChart';
 import TrendsChart from '../../../components/market/TrendsChart';
 import InsightsCard from '../../../components/market/InsightsCard';
-import { 
-  mockMarketDatabase, 
-  expenseLabels, 
-  incomeLabels, 
-  trendLabels,
-  ageOptions,
-  locationOptions 
-} from '../../../utils/marketIntelligenceData';
+import apiService from '../../../services/apiService';
 import styles from './InteligenciaMercado.module.css';
 
 /**
  * InteligenciaMercado - Página de análisis de inteligencia de mercado
+ * Migrado para usar backend API
  */
 function InteligenciaMercado() {
   const { currentUser, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Datos del backend
+  const [marketDatabase, setMarketDatabase] = useState({});
+  const [expenseLabels, setExpenseLabels] = useState([]);
+  const [incomeLabels, setIncomeLabels] = useState([]);
+  const [trendLabels, setTrendLabels] = useState([]);
+  const [ageOptions, setAgeOptions] = useState([]);
+  const [locationOptions, setLocationOptions] = useState([]);
 
   // Filtros principales
   const [age1, setAge1] = useState('18-25');
@@ -44,16 +47,18 @@ function InteligenciaMercado() {
   const [insightText, setInsightText] = useState('');
 
   // Generar insight
-  const generateInsight = useCallback((expensesDatasets, incomeData) => {
+  const generateInsight = useCallback((expensesDatasets, incomeData, labels) => {
+    if (!expensesDatasets.length || !labels.expense?.length) return;
+    
     const ds1 = expensesDatasets[0];
-    const topCat1 = expenseLabels[ds1.data.indexOf(Math.max(...ds1.data))];
-    const topIncome = incomeLabels[incomeData.indexOf(Math.max(...incomeData))];
+    const topCat1 = labels.expense[ds1.data.indexOf(Math.max(...ds1.data))];
+    const topIncome = labels.income[incomeData.indexOf(Math.max(...incomeData))];
     
     let insight = `Para el grupo <strong>${ds1.label}</strong>, la categoría con mayor gasto es <strong>${topCat1}</strong>. Su principal fuente de ingresos es <strong>${topIncome}</strong>.`;
 
     if (showComparison && expensesDatasets.length > 1) {
       const ds2 = expensesDatasets[1];
-      const topCat2 = expenseLabels[ds2.data.indexOf(Math.max(...ds2.data))];
+      const topCat2 = labels.expense[ds2.data.indexOf(Math.max(...ds2.data))];
       insight += `<br><br>En comparación, para <strong>${ds2.label}</strong>, la categoría principal es <strong>${topCat2}</strong>.`;
     }
 
@@ -67,37 +72,67 @@ function InteligenciaMercado() {
     }
   }, [currentUser, isAdmin, navigate]);
 
+  // Cargar datos del backend
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const response = await apiService.market.getAll();
+        
+        setMarketDatabase(response.data || {});
+        setExpenseLabels(response.labels?.expenseLabels || []);
+        setIncomeLabels(response.labels?.incomeLabels || []);
+        setTrendLabels(response.labels?.trendLabels || []);
+        setAgeOptions(response.options?.ageOptions || []);
+        setLocationOptions(response.options?.locationOptions || []);
+      } catch (error) {
+        console.error('Error cargando datos de mercado:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (currentUser && isAdmin) {
+      loadData();
+    }
+  }, [currentUser, isAdmin]);
+
   // Actualizar dashboard cuando cambien los filtros
   useEffect(() => {
-    if (!currentUser || !isAdmin) return;
+    if (!currentUser || !isAdmin || !marketDatabase[location1]) return;
 
-    const dataGroup1 = mockMarketDatabase[location1][age1];
-    const label1 = `${ageOptions.find(o => o.value === age1)?.label} en ${locationOptions.find(o => o.value === location1)?.label}`;
+    const dataGroup1 = marketDatabase[location1]?.[age1];
+    if (!dataGroup1) return;
+
+    const label1 = `${ageOptions.find(o => o.value === age1)?.label || age1} en ${locationOptions.find(o => o.value === location1)?.label || location1}`;
 
     const expensesDatasets = [{
       label: label1,
-      data: dataGroup1.expenses
+      data: dataGroup1.expenses || []
     }];
 
-    if (showComparison) {
-      const dataGroup2 = mockMarketDatabase[location2][age2];
-      const label2 = `${ageOptions.find(o => o.value === age2)?.label} en ${locationOptions.find(o => o.value === location2)?.label}`;
+    if (showComparison && marketDatabase[location2]?.[age2]) {
+      const dataGroup2 = marketDatabase[location2][age2];
+      const label2 = `${ageOptions.find(o => o.value === age2)?.label || age2} en ${locationOptions.find(o => o.value === location2)?.label || location2}`;
       
       expensesDatasets.push({
         label: label2,
-        data: dataGroup2.expenses
+        data: dataGroup2.expenses || []
       });
     }
 
     setChartData({
       expenses: expensesDatasets,
-      income: dataGroup1.incomeSources,
-      trends: dataGroup1.trends
+      income: dataGroup1.incomeSources || [],
+      trends: dataGroup1.trends || { income: [], expenses: [] }
     });
 
     // Generar insight
-    generateInsight(expensesDatasets, dataGroup1.incomeSources);
-  }, [age1, location1, age2, location2, showComparison, currentUser, isAdmin, generateInsight]);
+    generateInsight(expensesDatasets, dataGroup1.incomeSources || [], {
+      expense: expenseLabels,
+      income: incomeLabels
+    });
+  }, [age1, location1, age2, location2, showComparison, currentUser, isAdmin, generateInsight, marketDatabase, ageOptions, locationOptions, expenseLabels, incomeLabels]);
 
   const downloadCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
@@ -143,6 +178,22 @@ function InteligenciaMercado() {
 
   if (!currentUser || !isAdmin) {
     return null;
+  }
+
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <Sidebar 
+          menuItems={adminMenuItems}
+          userMenuItems={userMenuItems}
+          variant="admin"
+          onCollapsedChange={setIsCollapsed}
+        />
+        <main className={`${styles.mainContent} ${isCollapsed ? styles.expanded : ''}`}>
+          <div className={styles.loading}>Cargando datos de mercado...</div>
+        </main>
+      </div>
+    );
   }
 
   return (

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import mockDB from '../../../utils/mockDatabase';
+import apiService from '../../../services/apiService';
 import { Card, Button, ConfirmDialog, Toast } from '../../../components/ui';
 import EditRecordModal from '../../../components/modals/EditRecordModal';
 import { HistorialTable } from '../../../components/historial';
@@ -50,24 +50,32 @@ function Historial() {
       return;
     }
 
-    try {
-      // Obtener historial del perfil actual
-      const registros = mockDB.historial.filter(
-        reg => reg.perfilId === currentPerfil.id
-      );
+    const cargarHistorial = async () => {
+      try {
+        setLoading(true);
+        
+        // Obtener historial del perfil actual desde backend
+        const registros = await apiService.historial.getAll(currentPerfil.id);
 
-      // Ordenar por fecha más reciente primero
-      registros.sort((a, b) => 
-        new Date(b.fechaEjecucion) - new Date(a.fechaEjecucion)
-      );
+        // Ordenar por fecha más reciente primero
+        registros.sort((a, b) => 
+          new Date(b.fechaEjecucion) - new Date(a.fechaEjecucion)
+        );
 
-      setHistorial(registros);
-      setFilteredHistorial(registros);
-    } catch (error) {
-      console.error('Error al cargar historial:', error);
-    } finally {
-      setLoading(false);
-    }
+        setHistorial(registros);
+        setFilteredHistorial(registros);
+      } catch (error) {
+        console.error('Error al cargar historial:', error);
+        setToast({
+          type: 'error',
+          message: 'Error al cargar el historial'
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarHistorial();
   }, [currentPerfil, authLoading, currentUser, navigate]);
 
   // Aplicar filtros cuando cambian
@@ -110,10 +118,10 @@ function Historial() {
   const stats = {
     totalIngresos: filteredHistorial
       .filter(r => r.tipo === 'ingreso')
-      .reduce((sum, r) => sum + r.monto, 0),
+      .reduce((sum, r) => sum + parseFloat(r.monto || 0), 0),
     totalEgresos: filteredHistorial
       .filter(r => r.tipo === 'egreso')
-      .reduce((sum, r) => sum + r.monto, 0),
+      .reduce((sum, r) => sum + parseFloat(r.monto || 0), 0),
     balance: 0
   };
   stats.balance = stats.totalIngresos - stats.totalEgresos;
@@ -152,26 +160,22 @@ function Historial() {
     setRecordToDelete(null);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!recordToDelete) return;
 
     try {
-      // Eliminar del mockDB.historial
-      const index = mockDB.historial.findIndex(r => r.id === recordToDelete.id);
-      if (index !== -1) {
-        mockDB.historial.splice(index, 1);
-        mockDB.saveToLocalStorage();
+      // Eliminar a través de la API
+      await apiService.historial.delete(currentPerfil.id, recordToDelete.id);
 
-        // Actualizar estados locales
-        setHistorial(prev => prev.filter(r => r.id !== recordToDelete.id));
-        setFilteredHistorial(prev => prev.filter(r => r.id !== recordToDelete.id));
+      // Actualizar estados locales
+      setHistorial(prev => prev.filter(r => r.id !== recordToDelete.id));
+      setFilteredHistorial(prev => prev.filter(r => r.id !== recordToDelete.id));
 
-        // Mostrar notificación
-        setToast({
-          type: 'success',
-          message: '✓ Registro eliminado exitosamente'
-        });
-      }
+      // Mostrar notificación
+      setToast({
+        type: 'success',
+        message: '✓ Registro eliminado exitosamente'
+      });
     } catch (error) {
       console.error('Error al eliminar registro:', error);
       setToast({
@@ -193,24 +197,20 @@ function Historial() {
     setRecordToEdit(null);
   };
 
-  const handleSaveEdit = (updatedRecord) => {
+  const handleSaveEdit = async (updatedRecord) => {
     try {
-      // Actualizar en mockDB.historial
-      const index = mockDB.historial.findIndex(r => r.id === updatedRecord.id);
-      if (index !== -1) {
-        mockDB.historial[index] = updatedRecord;
-        mockDB.saveToLocalStorage();
+      // Actualizar a través de la API
+      const updated = await apiService.historial.update(currentPerfil.id, updatedRecord.id, updatedRecord);
 
-        // Actualizar estados locales
-        setHistorial(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
-        setFilteredHistorial(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
+      // Actualizar estados locales
+      setHistorial(prev => prev.map(r => r.id === updatedRecord.id ? updated : r));
+      setFilteredHistorial(prev => prev.map(r => r.id === updatedRecord.id ? updated : r));
 
-        // Mostrar notificación
-        setToast({
-          type: 'success',
-          message: '✓ Registro actualizado exitosamente'
-        });
-      }
+      // Mostrar notificación
+      setToast({
+        type: 'success',
+        message: '✓ Registro actualizado exitosamente'
+      });
     } catch (error) {
       console.error('Error al actualizar registro:', error);
       setToast({
@@ -271,7 +271,7 @@ function Historial() {
         <div className={styles.statsGrid}>
           <Card variant="success" icon="💰" title="Ingresos">
             <div className={styles.statValue}>
-              {currentPerfil.simboloMoneda}{stats.totalIngresos.toLocaleString()}
+              {currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$'}{stats.totalIngresos.toLocaleString()}
             </div>
             <div className={styles.statLabel}>
               {filteredHistorial.filter(r => r.tipo === 'ingreso').length} transacciones
@@ -280,7 +280,7 @@ function Historial() {
 
           <Card variant="danger" icon="💸" title="Egresos">
             <div className={styles.statValue}>
-              {currentPerfil.simboloMoneda}{stats.totalEgresos.toLocaleString()}
+              {currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$'}{stats.totalEgresos.toLocaleString()}
             </div>
             <div className={styles.statLabel}>
               {filteredHistorial.filter(r => r.tipo === 'egreso').length} transacciones
@@ -289,7 +289,7 @@ function Historial() {
 
           <Card variant={stats.balance >= 0 ? 'primary' : 'warning'} icon="📊" title="Balance">
             <div className={styles.statValue}>
-              {currentPerfil.simboloMoneda}{stats.balance.toLocaleString()}
+              {currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$'}{stats.balance.toLocaleString()}
             </div>
             <div className={styles.statLabel}>
               {filteredHistorial.length} total
@@ -380,7 +380,7 @@ function Historial() {
           <div className={styles.tableContainer}>
             <HistorialTable
               registros={currentItems}
-              simboloMoneda={currentPerfil.simboloMoneda}
+              simboloMoneda={currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$'}
               onEdit={handleEdit}
               onDelete={handleDelete}
               emptyMessage="No se encontraron transacciones con los filtros aplicados"
@@ -431,7 +431,7 @@ function Historial() {
         record={recordToEdit}
         onCancel={handleCloseEditModal}
         onSave={handleSaveEdit}
-        simboloMoneda={currentPerfil.simboloMoneda}
+        simboloMoneda={currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$'}
       />
 
       <ConfirmDialog

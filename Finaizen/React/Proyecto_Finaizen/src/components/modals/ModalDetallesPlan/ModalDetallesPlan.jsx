@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import mockDB from '../../../utils/mockDatabase';
+import { useAuth } from '../../../context/AuthContext';
+import apiService from '../../../services/apiService';
 import Button from '../../ui/Button';
 import styles from './ModalDetallesPlan.module.css';
 
@@ -8,43 +9,57 @@ import styles from './ModalDetallesPlan.module.css';
  * ModalDetallesPlan - Modal para ver detalles completos y gestionar un plan
  */
 function ModalDetallesPlan({ isOpen, plan, onClose, onPausar, onReactivar, onRefresh, simboloMoneda }) {
+  const { currentPerfil } = useAuth();
   const [modoDeposito, setModoDeposito] = useState(false);
   const [montoDeposito, setMontoDeposito] = useState('');
   const [descripcionDeposito, setDescripcionDeposito] = useState('');
 
   if (!isOpen || !plan) return null;
 
-  const handleAgregarDeposito = () => {
+  const handleAgregarDeposito = async () => {
     const monto = parseFloat(montoDeposito);
     if (monto <= 0) {
       alert('Ingresa un monto válido');
       return;
     }
 
-    const result = mockDB.agregarDepositoPlan(plan.id, monto, descripcionDeposito);
-
-    if (result.success) {
+    try {
+      const nuevoMontoActual = parseFloat(plan.montoActual || 0) + monto;
+      await apiService.planesAhorro.update(currentPerfil.id, plan.id, {
+        montoActual: nuevoMontoActual,
+        estado: nuevoMontoActual >= parseFloat(plan.montoMeta) ? 'completado' : plan.estado
+      });
+      
       setMontoDeposito('');
       setDescripcionDeposito('');
       setModoDeposito(false);
       onRefresh();
+    } catch (error) {
+      console.error('Error al agregar depósito:', error);
+      alert('Error al agregar depósito');
     }
   };
 
-  const handleRetirar = () => {
+  const handleRetirar = async () => {
     const monto = parseFloat(montoDeposito);
-    if (monto <= 0 || monto > plan.montoActual) {
+    if (monto <= 0 || monto > parseFloat(plan.montoActual || 0)) {
       alert('Ingresa un monto válido');
       return;
     }
 
-    const result = mockDB.retirarDelPlan(plan.id, monto, descripcionDeposito);
-
-    if (result.success) {
+    try {
+      const nuevoMontoActual = parseFloat(plan.montoActual || 0) - monto;
+      await apiService.planesAhorro.update(currentPerfil.id, plan.id, {
+        montoActual: nuevoMontoActual
+      });
+      
       setMontoDeposito('');
       setDescripcionDeposito('');
       setModoDeposito(false);
       onRefresh();
+    } catch (error) {
+      console.error('Error al retirar:', error);
+      alert('Error al retirar');
     }
   };
 
@@ -104,19 +119,19 @@ function ModalDetallesPlan({ isOpen, plan, onClose, onPausar, onReactivar, onRef
             <div className={styles.datos}>
               <div className={styles.dato}>
                 <label>Ahorrado</label>
-                <p className={styles.valor}>{simboloMoneda}{plan.montoActual.toLocaleString()}</p>
+                <p className={styles.valor}>{simboloMoneda}{(plan.montoActual || 0).toLocaleString()}</p>
               </div>
               <div className={styles.dato}>
                 <label>Meta</label>
-                <p className={styles.valor}>{simboloMoneda}{plan.montoMeta.toLocaleString()}</p>
+                <p className={styles.valor}>{simboloMoneda}{(plan.montoMeta || 0).toLocaleString()}</p>
               </div>
               <div className={styles.dato}>
                 <label>Faltante</label>
-                <p className={styles.valor}>{simboloMoneda}{plan.montoFaltante.toLocaleString()}</p>
+                <p className={styles.valor}>{simboloMoneda}{(plan.montoFaltante || 0).toLocaleString()}</p>
               </div>
               <div className={styles.dato}>
                 <label>Mensual Estimado</label>
-                <p className={styles.valor}>{simboloMoneda}{plan.montoAhorrarMensualEstimado.toFixed(2)}</p>
+                <p className={styles.valor}>{simboloMoneda}{(plan.montoAhorrarMensualEstimado || 0).toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -145,11 +160,11 @@ function ModalDetallesPlan({ isOpen, plan, onClose, onPausar, onReactivar, onRef
           </div>
 
           {/* Historial de depósitos */}
-          {plan.historialAhorros.length > 0 && (
+          {(plan.historialAhorros || []).length > 0 && (
             <div className={styles.seccion}>
               <h3 className={styles.seccionTitulo}>Historial de Movimientos</h3>
               <div className={styles.historial}>
-                {plan.historialAhorros.slice(-5).reverse().map((movimiento, idx) => (
+                {(plan.historialAhorros || []).slice(-5).reverse().map((movimiento, idx) => (
                   <div
                     key={idx}
                     className={`${styles.movimiento} ${movimiento.tipo === 'deposito' ? styles.deposito : styles.retiro}`}

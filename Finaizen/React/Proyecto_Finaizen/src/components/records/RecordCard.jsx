@@ -26,11 +26,20 @@ function RecordCard({
   const getFrequencyDetails = () => {
     switch (record.frecuencia) {
       case 'semanal':
-        return ` • ${getDiaSemana(record.diaSemana)}`;
+        // diasSemana es un array de números [0-6], 0=Domingo
+        if (record.diasSemana && Array.isArray(record.diasSemana) && record.diasSemana.length > 0) {
+          const diasLabels = record.diasSemana.map(dia => getDiaSemanaCorto(dia)).join(', ');
+          return ` • ${diasLabels}`;
+        }
+        return '';
       case 'mensual':
-        return ` • Día ${record.diaMes}`;
+        return record.diaMes ? ` • Día ${record.diaMes}` : '';
       case 'anual':
-        return ` • ${record.mes}/${record.diaMes}`;
+        if (record.fechaEspecifica) {
+          const fecha = new Date(record.fechaEspecifica);
+          return ` • ${fecha.getDate()}/${fecha.getMonth() + 1}`;
+        }
+        return '';
       default:
         return '';
     }
@@ -54,7 +63,7 @@ function RecordCard({
       
       <div className={styles.recordDetails}>
         <span className={`${styles.amount} ${tipo === 'ingreso' ? styles.positive : styles.negative}`}>
-          {tipo === 'ingreso' ? '+' : '-'} {simboloMoneda}{record.monto.toFixed(2)}
+          {tipo === 'ingreso' ? '+' : '-'} {simboloMoneda}{parseFloat(record.monto || 0).toFixed(2)}
         </span>
         
         <div className={styles.actions}>
@@ -82,16 +91,16 @@ function RecordCard({
   );
 }
 
-// Función auxiliar para obtener el nombre del día de la semana
-function getDiaSemana(dia) {
+// Función auxiliar para obtener el nombre corto del día de la semana
+function getDiaSemanaCorto(dia) {
   const dias = {
-    1: 'Lunes',
-    2: 'Martes',
-    3: 'Miércoles',
-    4: 'Jueves',
-    5: 'Viernes',
-    6: 'Sábado',
-    0: 'Domingo'
+    0: 'Dom',
+    1: 'Lun',
+    2: 'Mar',
+    3: 'Mié',
+    4: 'Jue',
+    5: 'Vie',
+    6: 'Sáb'
   };
   return dias[dia] || dia;
 }

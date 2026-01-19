@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import mockDB from '../../../utils/mockDatabase';
+import apiService from '../../../services/apiService';
 import { Button, Toast, ConfirmDialog } from '../../../components/ui';
 import { RecordCard } from '../../../components/records';
 import styles from './AdministrarRegistros.module.css';
@@ -38,17 +38,19 @@ function AdministrarRegistros() {
   /**
    * Carga los ingresos y egresos del perfil actual
    */
-  const loadRecords = useCallback(() => {
+  const loadRecords = useCallback(async () => {
     try {
-      // Filtrar ingresos del perfil (excluyendo ocasionales)
-      const perfilIngresos = mockDB.ingresos.filter(
-        ing => currentPerfil.ingresos.includes(ing.id) && ing.frecuencia !== 'ocasional'
-      );
+      setLoading(true);
+      
+      // Cargar desde backend
+      const [ingresosData, egresosData] = await Promise.all([
+        apiService.ingresos.getAll(currentPerfil.id),
+        apiService.egresos.getAll(currentPerfil.id)
+      ]);
 
-      // Filtrar egresos del perfil (excluyendo ocasionales)
-      const perfilEgresos = mockDB.egresos.filter(
-        eg => currentPerfil.egresos.includes(eg.id) && eg.frecuencia !== 'ocasional'
-      );
+      // Filtrar solo no ocasionales (ocasionales van directo a historial)
+      const perfilIngresos = ingresosData.filter(ing => ing.frecuencia !== 'ocasional');
+      const perfilEgresos = egresosData.filter(eg => eg.frecuencia !== 'ocasional');
 
       setIngresos(perfilIngresos);
       setEgresos(perfilEgresos);
@@ -152,38 +154,25 @@ function AdministrarRegistros() {
   /**
    * Confirma la eliminación de un registro
    */
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!recordToDelete) return;
 
     const { record, tipo } = recordToDelete;
 
     try {
       if (tipo === 'ingreso') {
-        // Eliminar del array de ingresos
-        const index = mockDB.ingresos.findIndex(i => i.id === record.id);
-        if (index > -1) {
-          mockDB.ingresos.splice(index, 1);
-        }
-        // Eliminar del perfil
-        currentPerfil.eliminarIngreso(record.id);
+        // Eliminar desde backend
+        await apiService.ingresos.delete(currentPerfil.id, record.id);
         
         // Actualizar estado local inmediatamente
         setIngresos(prev => prev.filter(i => i.id !== record.id));
       } else {
-        // Eliminar del array de egresos
-        const index = mockDB.egresos.findIndex(e => e.id === record.id);
-        if (index > -1) {
-          mockDB.egresos.splice(index, 1);
-        }
-        // Eliminar del perfil
-        currentPerfil.eliminarEgreso(record.id);
+        // Eliminar desde backend
+        await apiService.egresos.delete(currentPerfil.id, record.id);
         
         // Actualizar estado local inmediatamente
         setEgresos(prev => prev.filter(e => e.id !== record.id));
       }
-
-      // Guardar en localStorage
-      mockDB.saveToLocalStorage();
 
       setToast({
         type: 'success',
@@ -295,7 +284,7 @@ function AdministrarRegistros() {
                       key={ingreso.id}
                       record={ingreso}
                       tipo="ingreso"
-                      simboloMoneda={currentPerfil.simboloMoneda}
+                      simboloMoneda={currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$'}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                     />
@@ -317,7 +306,7 @@ function AdministrarRegistros() {
                       key={egreso.id}
                       record={egreso}
                       tipo="egreso"
-                      simboloMoneda={currentPerfil.simboloMoneda}
+                      simboloMoneda={currentPerfil?.moneda?.simbolo || currentPerfil?.simboloMoneda || '$'}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                     />

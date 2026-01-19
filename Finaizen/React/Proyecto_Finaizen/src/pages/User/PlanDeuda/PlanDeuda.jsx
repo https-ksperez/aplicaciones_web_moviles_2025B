@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import mockDB from '../../../utils/mockDatabase';
+import apiService from '../../../services/apiService';
 import { Button, Toast } from '../../../components/ui';
 import DeudaCard from '../../../components/cards/DeudaCard';
 import PlanDeudaModal from '../../../components/modals/PlanDeudaModal';
@@ -28,51 +28,143 @@ function PlanDeuda() {
   const [consejos, setConsejos] = useState([]);
   const [estadisticas, setEstadisticas] = useState(null);
 
-  const simboloMoneda = currentPerfil?.moneda.simbolo || '$';
+  const simboloMoneda = currentPerfil?.moneda?.simbolo || '$';
 
-  const cargarDatos = useCallback(() => {
+  const cargarDatos = useCallback(async () => {
     if (!currentPerfil) return;
 
     setLoading(true);
-    const deudasDelPerfil = mockDB.getPlanesDePerfil_Deuda(currentPerfil.id);
-    setDeudas(deudasDelPerfil);
+    try {
+      const deudasDelPerfil = await apiService.planesDeuda.getAll(currentPerfil.id);
+      
+      // Transformar datos para que tengan todos los campos necesarios
+      const hoy = new Date();
+      const deudasTransformadas = deudasDelPerfil.map(d => {
+        const montoDeuda = parseFloat(d.montoDeuda || 0);
+        const montoPagado = parseFloat(d.montoPagado || 0);
+        const montoFaltante = Math.max(0, montoDeuda - montoPagado);
+        const progreso = montoDeuda > 0 ? (montoPagado / montoDeuda) * 100 : 0;
+        
+        // Calcular días restantes para próximo pago
+        let diasRestantes = 0;
+        if (d.fechaPago) {
+          const fechaPago = new Date(d.fechaPago);
+          diasRestantes = Math.ceil((fechaPago - hoy) / (1000 * 60 * 60 * 24));
+        }
 
-    // Cargar estadísticas
-    const stats = mockDB.obtenerEstadisticasDeuda(currentPerfil.id);
-    setEstadisticas(stats);
+        // Calcular cuota mensual e interés generado
+        const mesesRestantes = Math.max(1, Math.ceil(diasRestantes / 30));
+        const tasaInteres = parseFloat(d.tasaInteres || 0);
+        const interesGenerado = (montoDeuda * tasaInteres / 100) * (mesesRestantes / 12);
+        const cuotaMensual = montoFaltante > 0 ? montoFaltante / mesesRestantes : 0;
 
-    // Generar consejos si hay deudas activas
-    if (deudasDelPerfil.length > 0) {
-      const todosConsejos = [];
-      deudasDelPerfil.forEach(deuda => {
-        const consejosDelDeuda = mockDB.generarConsejosDeuda(deuda.id);
-        todosConsejos.push(...consejosDelDeuda);
+        return {
+          ...d,
+          montoDeuda,
+          montoPagado,
+          montoFaltante,
+          progreso,
+          diasRestantes,
+          tasaInteres,
+          cuotaMensual,
+          interesGenerado,
+          historialPagos: d.historialPagos || [],
+          icono: d.icono || '💳',
+          color: d.color || '#FF6B6B'
+        };
       });
-      setConsejos(todosConsejos.slice(0, 3));
-    }
 
-    setLoading(false);
+      setDeudas(deudasTransformadas);
+
+      // Calcular estadísticas con campos correctos para EstadisticasDeuda
+      const deudasActivas = deudasTransformadas.filter(d => d.estado === 'activo');
+      const deudasCompletadas = deudasTransformadas.filter(d => d.estado === 'completado');
+      const deudasAtrasadas = deudasTransformadas.filter(d => d.estado === 'activo' && d.diasRestantes < 0);
+      const totalDeuda = deudasTransformadas.reduce((sum, d) => sum + d.montoDeuda, 0);
+      const totalPagado = deudasTransformadas.reduce((sum, d) => sum + d.montoPagado, 0);
+      const totalFaltante = deudasTransformadas.reduce((sum, d) => sum + d.montoFaltante, 0);
+      const promedioProgreso = deudasTransformadas.length > 0
+        ? deudasTransformadas.reduce((sum, d) => sum + d.progreso, 0) / deudasTransformadas.length
+        : 0;
+
+      // Próximo vencimiento
+      const deudasConVencimiento = deudasActivas
+        .filter(d => d.diasRestantes > 0)
+        .sort((a, b) => a.diasRestantes - b.diasRestantes);
+      const proximoVencimiento = deudasConVencimiento.length > 0 ? deudasConVencimiento[0] : null;
+
+      // Deuda más prioritaria
+      const prioridadOrden = { urgente: 4, alta: 3, normal: 2, baja: 1 };
+      const deudaMasPrioritaria = deudasActivas.length > 0
+        ? deudasActivas.sort((a, b) => (prioridadOrden[b.prioridad] || 0) - (prioridadOrden[a.prioridad] || 0))[0]
+        : null;
+
+      setEstadisticas({
+        totalDeudas: deudasTransformadas.length,
+        deudasActivas: deudasActivas.length,
+        deudasCompletadas: deudasCompletadas.length,
+        deudasAtrasadas: deudasAtrasadas.length,
+        totalDeuda,
+        totalPagado,
+        totalFaltante,
+        promedioProgreso,
+        proximoVencimiento,
+        deudaMasPrioritaria
+      });
+
+      // Generar consejos basados en las deudas
+      if (deudasTransformadas.length > 0) {
+        const consejosGenerados = [];
+        deudasTransformadas.forEach(deuda => {
+          if (deuda.progreso < 25) {
+            consejosGenerados.push({
+              id: `consejo-${deuda.id}-1`,
+              tipo: 'motivacion',
+              mensaje: `¡Ánimo con "${deuda.nombre}"! Cada pago te acerca a la libertad financiera.`,
+              deudaId: deuda.id
+            });
+          } else if (deuda.progreso >= 75 && deuda.progreso < 100) {
+            consejosGenerados.push({
+              id: `consejo-${deuda.id}-2`,
+              tipo: 'felicitacion',
+              mensaje: `¡Excelente! Estás muy cerca de liquidar "${deuda.nombre}".`,
+              deudaId: deuda.id
+            });
+          }
+        });
+        setConsejos(consejosGenerados.slice(0, 3));
+      }
+    } catch (error) {
+      console.error('Error al cargar deudas:', error);
+      setToast({
+        type: 'error',
+        message: 'Error al cargar las deudas'
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [currentPerfil]);
 
   useEffect(() => {
     cargarDatos();
   }, [cargarDatos]);
 
-  const handleCrearDeuda = (deudaData) => {
-    const result = mockDB.crearPlanDeuda({
-      ...deudaData,
-      perfilId: currentPerfil.id,
-      montoPagado: 0
-    });
+  const handleCrearDeuda = async (deudaData) => {
+    try {
+      const nuevaDeuda = await apiService.planesDeuda.create(currentPerfil.id, {
+        ...deudaData,
+        montoPagado: 0,
+        estado: 'activo'
+      });
 
-    if (result.success) {
       setToast({
         type: 'success',
-        message: `Deuda "${result.plan.nombre}" creada exitosamente 🎉`
+        message: `Deuda "${nuevaDeuda.nombre}" creada exitosamente 🎉`
       });
       setShowModal(false);
-      cargarDatos();
-    } else {
+      await cargarDatos();
+    } catch (error) {
+      console.error('Error al crear deuda:', error);
       setToast({
         type: 'error',
         message: 'Error al crear la deuda'
@@ -85,18 +177,19 @@ function PlanDeuda() {
     setShowModal(true);
   };
 
-  const handleGuardarEdicion = (deudaData) => {
-    const result = mockDB.actualizarPlanDeuda(editingDeuda.id, deudaData);
+  const handleGuardarEdicion = async (deudaData) => {
+    try {
+      await apiService.planesDeuda.update(currentPerfil.id, editingDeuda.id, deudaData);
 
-    if (result.success) {
       setToast({
         type: 'success',
         message: 'Deuda actualizada exitosamente ✓'
       });
       setShowModal(false);
       setEditingDeuda(null);
-      cargarDatos();
-    } else {
+      await cargarDatos();
+    } catch (error) {
+      console.error('Error al actualizar deuda:', error);
       setToast({
         type: 'error',
         message: 'Error al actualizar la deuda'
@@ -104,17 +197,18 @@ function PlanDeuda() {
     }
   };
 
-  const handleEliminarDeuda = (deudaId) => {
+  const handleEliminarDeuda = async (deudaId) => {
     if (window.confirm('¿Estás seguro de que deseas eliminar esta deuda?')) {
-      const result = mockDB.eliminarPlanDeuda(deudaId);
+      try {
+        await apiService.planesDeuda.delete(currentPerfil.id, deudaId);
 
-      if (result.success) {
         setToast({
           type: 'success',
           message: 'Deuda eliminada exitosamente'
         });
-        cargarDatos();
-      } else {
+        await cargarDatos();
+      } catch (error) {
+        console.error('Error al eliminar deuda:', error);
         setToast({
           type: 'error',
           message: 'Error al eliminar la deuda'
@@ -135,27 +229,31 @@ function PlanDeuda() {
     }, 300);
   };
 
-  const handlePausarDeuda = (deuda) => {
-    const result = mockDB.pausarPlanDeuda(deuda.id);
+  const handlePausarDeuda = async (deuda) => {
+    try {
+      await apiService.planesDeuda.update(currentPerfil.id, deuda.id, { estado: 'pausado' });
 
-    if (result.success) {
       setToast({
         type: 'info',
         message: 'Deuda pausada'
       });
-      cargarDatos();
+      await cargarDatos();
+    } catch (error) {
+      console.error('Error al pausar deuda:', error);
     }
   };
 
-  const handleReactivarDeuda = (deuda) => {
-    const result = mockDB.reactivarPlanDeuda(deuda.id);
+  const handleReactivarDeuda = async (deuda) => {
+    try {
+      await apiService.planesDeuda.update(currentPerfil.id, deuda.id, { estado: 'activo' });
 
-    if (result.success) {
       setToast({
         type: 'success',
         message: 'Deuda reactivada'
       });
-      cargarDatos();
+      await cargarDatos();
+    } catch (error) {
+      console.error('Error al reactivar deuda:', error);
     }
   };
 

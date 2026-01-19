@@ -219,20 +219,20 @@ function Sidebar({ menuItems, userMenuItems = [], variant = 'user', onCollapsedC
                     <li>
                       <button 
                         onClick={() => {
-                          if (currentUser?.premiumActivo) {
+                          if (currentUser?.isPremium) {
                             navigate('/user/config/cuenta');
                           } else {
                             setShowModalSuscripcion(true);
                           }
                           setShowUserDropdown(false);
                         }}
-                        className={currentUser?.premiumActivo ? styles.premiumActiveLink : styles.premiumLink}
+                        className={currentUser?.isPremium ? styles.premiumActiveLink : styles.premiumLink}
                       >
                         <span className={styles.icon}>
-                          {currentUser?.premiumActivo ? '👑' : '⭐'}
+                          {currentUser?.isPremium ? '👑' : '⭐'}
                         </span>
                         <span className={styles.text}>
-                          {currentUser?.premiumActivo ? 'Gestionar Premium' : 'Hazte Premium'}
+                          {currentUser?.isPremium ? 'Gestionar Premium' : 'Hazte Premium'}
                         </span>
                       </button>
                     </li>
