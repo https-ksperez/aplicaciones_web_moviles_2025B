@@ -1,0 +1,12 @@
+export { default as DashboardScreen } from './DashboardScreen';
+export { default as NuevoIngresoScreen } from './NuevoIngresoScreen';
+export { default as NuevoEgresoScreen } from './NuevoEgresoScreen';
+export { default as HistorialScreen } from './HistorialScreen';
+export { default as AdministrarRegistrosScreen } from './AdministrarRegistrosScreen';
+export { default as PresupuestosScreen } from './PresupuestosScreen';
+export { default as PlanAhorroScreen } from './PlanAhorroScreen';
+export { default as PlanDeudaScreen } from './PlanDeudaScreen';
+export { default as LogrosScreen } from './LogrosScreen';
+export { default as NotificacionesScreen } from './NotificacionesScreen';
+export { default as RegistroVozScreen } from './RegistroVozScreen';
+export { default as RegistroFotoScreen } from './RegistroFotoScreen';

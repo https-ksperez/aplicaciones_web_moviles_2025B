@@ -153,11 +153,26 @@ const startServer = async () => {
       console.log('📊 Base de datos sincronizada.');
     }
 
-    // Start server
-    app.listen(PORT, () => {
-      console.log(`🚀 Servidor corriendo en http://${config.HOST}:${PORT}`);
+    // Start server - Escuchar en 0.0.0.0 para aceptar conexiones de cualquier IP
+    const HOST = '0.0.0.0';
+    app.listen(PORT, HOST, () => {
+      console.log(`🚀 Servidor corriendo en http://${HOST}:${PORT}`);
+      console.log(`📱 Accesible desde dispositivos en la red local`);
       console.log(`📝 Entorno: ${config.NODE_ENV}`);
       console.log(`🔐 JWT configurado correctamente`);
+      
+      // Mostrar IPs disponibles para conectar
+      const { networkInterfaces } = require('os');
+      const nets = networkInterfaces();
+      console.log('\n📡 IPs disponibles para conectar:');
+      for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+          if (net.family === 'IPv4' && !net.internal) {
+            console.log(`   → http://${net.address}:${PORT}`);
+          }
+        }
+      }
+      console.log('');
       
       // Iniciar el scheduler de transacciones automáticas
       iniciarScheduler();
