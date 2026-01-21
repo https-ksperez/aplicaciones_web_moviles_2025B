@@ -29,7 +29,6 @@ import {
   stopListening,
   cancelListening,
   transcribeAudio,
-  setApiKey,
   getIsListening
 } from '../../services/speechService';
 
@@ -40,6 +39,8 @@ import {
  * - Grabación de audio con expo-av
  * - Transcripción con Google Cloud Speech o OpenAI Whisper
  * - Entrada de texto manual como fallback
+ * 
+ * Las API keys están precargadas en apiConfig.js
  */
 export default function RegistroVozScreen({ navigation }) {
   const { currentPerfil, isDemoMode } = useAuth();
@@ -52,8 +53,7 @@ export default function RegistroVozScreen({ navigation }) {
   const [parsedData, setParsedData] = useState(null);
   const [saving, setSaving] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [showApiConfig, setShowApiConfig] = useState(false);
-  const [apiKey, setApiKeyState] = useState('');
+  // Ya no necesitamos showApiConfig ni apiKey porque están precargados
   
   // Animación del botón de grabación
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -120,22 +120,9 @@ export default function RegistroVozScreen({ navigation }) {
     }
   };
 
-  // Iniciar grabación
+  // Iniciar grabación (ya no pide API key porque está precargada)
   const handleStartRecording = async () => {
     try {
-      if (!apiKey) {
-        Alert.alert(
-          'Configurar API',
-          'Para usar el reconocimiento de voz, necesitas configurar una API Key de OpenAI o Google Cloud.',
-          [
-            { text: 'Cancelar', style: 'cancel' },
-            { text: 'Configurar', onPress: () => setShowApiConfig(true) }
-          ]
-        );
-        return;
-      }
-      
-      setApiKey('openai', apiKey);
       await startListening();
       setIsRecording(true);
     } catch (error) {
@@ -219,15 +206,6 @@ export default function RegistroVozScreen({ navigation }) {
     setParsedData(null);
   };
 
-  // Guardar API Key
-  const handleSaveApiKey = () => {
-    if (apiKey.trim()) {
-      setApiKey('openai', apiKey);
-      setShowApiConfig(false);
-      Alert.alert('✅ Configurado', 'API Key guardada correctamente');
-    }
-  };
-
   // Formatear tiempo
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -258,9 +236,6 @@ export default function RegistroVozScreen({ navigation }) {
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.backButton}>← Volver</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowApiConfig(true)}>
-            <Text style={styles.configButton}>⚙️</Text>
           </TouchableOpacity>
         </View>
         <Text style={styles.title}>🎤 Registro por Voz</Text>
@@ -344,16 +319,6 @@ export default function RegistroVozScreen({ navigation }) {
               • "Pagué 30 de taxi"{'\n'}
               • "Recibí 1000 de salario"
             </Text>
-            {!apiKey && voiceAvailable && (
-              <TouchableOpacity 
-                style={styles.configHint}
-                onPress={() => setShowApiConfig(true)}
-              >
-                <Text style={styles.configHintText}>
-                  ⚙️ Configura tu API Key para usar el reconocimiento de voz
-                </Text>
-              </TouchableOpacity>
-            )}
           </Card>
 
           {/* Entrada de texto */}
@@ -472,44 +437,6 @@ export default function RegistroVozScreen({ navigation }) {
         )}
       </KeyboardAvoidingView>
 
-      {/* Modal de configuración de API */}
-      {showApiConfig && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>⚙️ Configurar API</Text>
-            <Text style={styles.modalDescription}>
-              Para usar el reconocimiento de voz, necesitas una API Key de OpenAI.{'\n\n'}
-              Obtén una en: platform.openai.com
-            </Text>
-            
-            <TextInput
-              style={styles.apiKeyInput}
-              value={apiKey}
-              onChangeText={setApiKeyState}
-              placeholder="sk-..."
-              placeholderTextColor="#9ca3af"
-              secureTextEntry
-              autoCapitalize="none"
-            />
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => setShowApiConfig(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.modalSaveButton}
-                onPress={handleSaveApiKey}
-              >
-                <Text style={styles.modalSaveText}>Guardar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
     </SafeAreaView>
   );
 }

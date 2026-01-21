@@ -32,6 +32,10 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+
+# API Config con claves sensibles (usar apiConfig.example.js como referencia)
+src/config/apiConfig.js
 
 # typescript
 *.tsbuildinfo

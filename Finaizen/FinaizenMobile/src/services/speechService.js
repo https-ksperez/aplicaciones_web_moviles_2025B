@@ -6,25 +6,29 @@
  * - OpenAI Whisper API
  * 
  * Funciona con Expo Go - no requiere build nativo
+ * 
+ * Las API keys están precargadas desde apiConfig.js
  */
 
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+// Usar la API legacy de expo-file-system para compatibilidad con SDK 54
+import * as FileSystem from 'expo-file-system/legacy';
+import API_CONFIG_GLOBAL from '../config/apiConfig';
 
-// Configuración de APIs
+// Configuración de APIs (precargada desde apiConfig.js)
 const API_CONFIG = {
   // Google Cloud Speech-to-Text
   googleSpeech: {
-    apiKey: '', // Agregar tu API key de Google Cloud
-    endpoint: 'https://speech.googleapis.com/v1/speech:recognize',
+    apiKey: API_CONFIG_GLOBAL.speech.google.apiKey,
+    endpoint: API_CONFIG_GLOBAL.speech.google.endpoint,
   },
   // OpenAI Whisper
   openai: {
-    apiKey: '', // Agregar tu API key de OpenAI
-    endpoint: 'https://api.openai.com/v1/audio/transcriptions',
+    apiKey: API_CONFIG_GLOBAL.speech.openai.apiKey,
+    endpoint: API_CONFIG_GLOBAL.speech.openai.endpoint,
   },
   // Proveedor activo: 'google' o 'openai'
-  provider: 'openai', // Cambiar según el proveedor que quieras usar
+  provider: API_CONFIG_GLOBAL.speech.defaultProvider,
 };
 
 // Estado de grabación
@@ -78,14 +82,38 @@ export async function startListening() {
       playsInSilentModeIOS: true,
     });
 
-    // Iniciar grabación
+    // Configuración de grabación compatible con Google Speech API
+    // Usando AMR_NB que Google soporta nativamente
+    const recordingOptions = {
+      android: {
+        extension: '.amr',
+        outputFormat: Audio.AndroidOutputFormat.AMR_NB,
+        audioEncoder: Audio.AndroidAudioEncoder.AMR_NB,
+        sampleRate: 8000,
+        numberOfChannels: 1,
+        bitRate: 12200,
+      },
+      ios: {
+        extension: '.amr',
+        outputFormat: Audio.IOSOutputFormat.AMR,
+        audioQuality: Audio.IOSAudioQuality.LOW,
+        sampleRate: 8000,
+        numberOfChannels: 1,
+        bitRate: 12200,
+      },
+      web: {
+        mimeType: 'audio/webm',
+        bitsPerSecond: 128000,
+      },
+    };
+
     const { recording: newRecording } = await Audio.Recording.createAsync(
-      Audio.RecordingOptionsPresets.HIGH_QUALITY
+      recordingOptions
     );
     
     recording = newRecording;
     isListening = true;
-    console.log('🎙️ Grabación iniciada');
+    console.log('🎙️ Grabación iniciada (formato AMR para Google Speech)');
     
     return true;
   } catch (error) {
@@ -160,36 +188,47 @@ async function transcribeWithGoogle(audioUri) {
     throw new Error('API Key de Google Cloud no configurada');
   }
 
+  console.log('📤 Leyendo archivo de audio:', audioUri);
+  
   // Leer archivo de audio y convertir a base64
   const audioBase64 = await FileSystem.readAsStringAsync(audioUri, {
-    encoding: FileSystem.EncodingType.Base64,
+    encoding: 'base64',
   });
+  
+  console.log('📤 Audio en base64, tamaño:', audioBase64.length, 'caracteres');
+
+  const requestBody = {
+    config: {
+      // Formato AMR-NB compatible con la grabación
+      encoding: 'AMR',
+      sampleRateHertz: 8000,
+      languageCode: 'es-ES',
+      enableAutomaticPunctuation: true,
+    },
+    audio: {
+      content: audioBase64,
+    },
+  };
+
+  console.log('📤 Enviando a Google Speech API...');
 
   const response = await fetch(`${endpoint}?key=${apiKey}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      config: {
-        encoding: 'LINEAR16',
-        sampleRateHertz: 44100,
-        languageCode: 'es-ES',
-        enableAutomaticPunctuation: true,
-      },
-      audio: {
-        content: audioBase64,
-      },
-    }),
+    body: JSON.stringify(requestBody),
   });
 
+  const data = await response.json();
+  console.log('📥 Respuesta de Google Speech:', JSON.stringify(data, null, 2));
+
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Error en Google Speech API');
+    throw new Error(data.error?.message || 'Error en Google Speech API');
   }
 
-  const data = await response.json();
   const transcript = data.results?.[0]?.alternatives?.[0]?.transcript || '';
+  console.log('📝 Transcripción:', transcript || '(vacía)');
   
   return transcript;
 }
@@ -203,6 +242,8 @@ async function transcribeWithOpenAI(audioUri) {
   if (!apiKey) {
     throw new Error('API Key de OpenAI no configurada');
   }
+
+  console.log('📤 Enviando audio a OpenAI Whisper:', audioUri);
 
   // Crear FormData con el archivo de audio
   const formData = new FormData();
@@ -222,13 +263,17 @@ async function transcribeWithOpenAI(audioUri) {
     body: formData,
   });
 
+  const data = await response.json();
+  console.log('📥 Respuesta de OpenAI Whisper:', JSON.stringify(data, null, 2));
+
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Error en OpenAI Whisper API');
+    throw new Error(data.error?.message || 'Error en OpenAI Whisper API');
   }
 
-  const data = await response.json();
-  return data.text || '';
+  const transcript = data.text || '';
+  console.log('📝 Transcripción:', transcript || '(vacía)');
+  
+  return transcript;
 }
 
 /**
@@ -272,19 +317,87 @@ export function setProvider(provider) {
 /**
  * Parsear texto (de entrada manual o voz) para extraer información de gasto/ingreso
  * Esta función SÍ funciona y es útil independientemente del origen del texto
+ * 
+ * MEJORADO: Detección más precisa de ingreso vs egreso
  */
 export function parseVoiceExpense(text) {
   const lowerText = text.toLowerCase();
   
-  // Detectar si es ingreso o egreso
-  const esIngreso = lowerText.includes('recibi') || 
-                    lowerText.includes('gane') || 
-                    lowerText.includes('cobr') ||
-                    lowerText.includes('ingres') ||
-                    lowerText.includes('me pagaron') ||
-                    lowerText.includes('me dieron');
+  // ============================================
+  // DETECCIÓN MEJORADA DE TIPO (INGRESO/EGRESO)
+  // ============================================
   
-  const tipo = esIngreso ? 'ingreso' : 'egreso';
+  // Palabras clave que indican INGRESO
+  const palabrasIngreso = [
+    'recibi', 'recibí', 'recibido',
+    'gane', 'gané', 'ganado', 'ganancia',
+    'cobr', 'cobré', 'cobrado',
+    'ingres', 'ingresé', 'ingresado', 'ingreso',
+    'me pagaron', 'me pago', 'me pagó',
+    'me dieron', 'me dio',
+    'me depositaron', 'deposito a favor', 'depósito a favor',
+    'deposito de', 'depósito de', 'deposito en', 'depósito en', // Depósito DE/EN = ingreso
+    'me transfirieron', 'transferencia recibida',
+    'sueldo', 'salario', 'quincena', 'nomina', 'nómina',
+    'bono', 'aguinaldo', 'comisión', 'comision',
+    'vendi', 'vendí', 'venta de',
+    'devolucion', 'devolución', 'reembolso',
+    'premio', 'loteria', 'lotería',
+    'herencia', 'regalo recibido',
+    'renta cobrada', 'alquiler cobrado',
+    'dividendo', 'rendimiento', 'interés ganado', 'interes ganado',
+    'banco', 'cuenta bancaria' // Depósitos bancarios generalmente son ingresos
+  ];
+  
+  // Palabras clave que indican EGRESO
+  const palabrasEgreso = [
+    'gaste', 'gasté', 'gastado', 'gasto de',
+    'pague', 'pagué', 'pagado', 'pago de', 'pago por',
+    'compre', 'compré', 'comprado', 'compra de',
+    'costo', 'costó', 'me costó',
+    'invertí', 'inverti', 'inversión en',
+    'di', 'dí', 'le di',
+    'presté', 'preste', 'préstamo a',
+    'doné', 'done', 'donación',
+    'transferí', 'transferi', 'transferencia a',
+    'deposité', 'deposite', 'depósito a', // Yo deposité A alguien = egreso
+    'debito', 'débito', 'cargo',
+    'factura', 'cuenta de', 'recibo de',
+    'multa', 'impuesto', 'cuota',
+    'subscripcion', 'suscripción', 'membresía', 'membresia',
+    'pedí', 'pedi', 'ordené', 'ordene'
+  ];
+  
+  // Contar coincidencias
+  let puntosIngreso = 0;
+  let puntosEgreso = 0;
+  
+  for (const palabra of palabrasIngreso) {
+    if (lowerText.includes(palabra)) {
+      puntosIngreso += palabra.length > 5 ? 2 : 1; // Palabras más largas dan más peso
+    }
+  }
+  
+  for (const palabra of palabrasEgreso) {
+    if (lowerText.includes(palabra)) {
+      puntosEgreso += palabra.length > 5 ? 2 : 1;
+    }
+  }
+  
+  // Determinar tipo basado en puntos
+  // Por defecto es egreso (los gastos son más comunes)
+  let tipo = 'egreso';
+  if (puntosIngreso > puntosEgreso) {
+    tipo = 'ingreso';
+  } else if (puntosIngreso === puntosEgreso && puntosIngreso > 0) {
+    // Si hay empate y hay puntos, revisar contexto adicional
+    // Palabras como "me" + verbo positivo suelen indicar ingreso
+    if (lowerText.includes('me ') && (lowerText.includes('pag') || lowerText.includes('di'))) {
+      tipo = 'ingreso';
+    }
+  }
+  
+  console.log(`🔍 Detección de tipo: "${text.substring(0, 50)}..." → Ingreso: ${puntosIngreso}, Egreso: ${puntosEgreso} → ${tipo}`);
   
   // Patrones para extraer monto
   const montoPatterns = [

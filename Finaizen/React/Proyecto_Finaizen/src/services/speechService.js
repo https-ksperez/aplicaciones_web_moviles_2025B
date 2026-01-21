@@ -145,11 +145,20 @@ export class VoiceRecognition {
 export function parseVoiceExpense(text) {
   const lowerText = text.toLowerCase();
   
-  // Patrones para extraer monto
+  // Patrones para extraer monto (mejorados)
   const montoPatterns = [
-    /(\d+(?:[.,]\d{1,2})?)\s*(?:pesos|dolares|euros|soles|quetzales)/i,
-    /(?:gaste|gasto|pague|pago)\s*(\d+(?:[.,]\d{1,2})?)/i,
-    /(\d+(?:[.,]\d{1,2})?)\s*(?:de|en)/i
+    // "50 dólares de McDonald's" - número seguido de moneda
+    /(\d+(?:[.,]\d{1,2})?)\s*(?:pesos|dolares|dólares|euros|soles|quetzales|dollars)/i,
+    // "gasté 50 en comida"
+    /(?:gaste|gasté|gasto|pague|pagué|pago|compre|compré)\s*(\d+(?:[.,]\d{1,2})?)/i,
+    // "50 de taxi" o "50 en comida"
+    /(\d+(?:[.,]\d{1,2})?)\s*(?:de|en|por)\s/i,
+    // "$50" o "$ 50"
+    /\$\s*(\d+(?:[.,]\d{1,2})?)/i,
+    // Cualquier número al inicio del texto
+    /^(\d+(?:[.,]\d{1,2})?)/i,
+    // Cualquier número en el texto
+    /(\d+(?:[.,]\d{1,2})?)/i
   ];
 
   let monto = 0;
@@ -157,29 +166,31 @@ export function parseVoiceExpense(text) {
     const match = text.match(pattern);
     if (match) {
       monto = parseFloat(match[1].replace(',', '.'));
-      break;
+      if (monto > 0) break; // Si encontramos un monto válido, salimos
     }
   }
 
   // Extraer categoría basada en palabras clave
   const categorias = {
-    'alimentacion': ['comida', 'restaurante', 'mercado', 'super', 'almuerzo', 'cena', 'desayuno', 'alimento'],
-    'transporte': ['taxi', 'uber', 'bus', 'metro', 'gasolina', 'combustible', 'transporte'],
-    'entretenimiento': ['cine', 'concierto', 'juego', 'diversión', 'entretenimiento'],
-    'salud': ['farmacia', 'doctor', 'medicina', 'hospital', 'consulta', 'salud'],
-    'servicios': ['luz', 'agua', 'internet', 'telefono', 'servicio', 'factura'],
-    'educacion': ['libro', 'curso', 'escuela', 'universidad', 'clase', 'educación'],
-    'ropa': ['ropa', 'zapatos', 'vestido', 'camisa', 'pantalon'],
-    'hogar': ['mueble', 'decoracion', 'casa', 'hogar']
+    'Alimentación': ['comida', 'restaurante', 'mercado', 'super', 'almuerzo', 'cena', 'desayuno', 'alimento', 'mcdonald', 'burger', 'pizza', 'cafe', 'café', 'tacos', 'pollo'],
+    'Transporte': ['taxi', 'uber', 'bus', 'metro', 'gasolina', 'combustible', 'transporte', 'didi', 'cabify'],
+    'Entretenimiento': ['cine', 'concierto', 'juego', 'diversión', 'entretenimiento', 'netflix', 'spotify'],
+    'Salud': ['farmacia', 'doctor', 'medicina', 'hospital', 'consulta', 'salud', 'medico', 'médico'],
+    'Servicios': ['luz', 'agua', 'internet', 'telefono', 'teléfono', 'servicio', 'factura', 'cable'],
+    'Educación': ['libro', 'curso', 'escuela', 'universidad', 'clase', 'educación'],
+    'Ropa': ['ropa', 'zapatos', 'vestido', 'camisa', 'pantalon', 'pantalón'],
+    'Hogar': ['mueble', 'decoracion', 'decoración', 'casa', 'hogar']
   };
 
-  let categoria = 'otros';
+  let categoria = 'Otros';
   for (const [cat, keywords] of Object.entries(categorias)) {
     if (keywords.some(keyword => lowerText.includes(keyword))) {
       categoria = cat;
       break;
     }
   }
+
+  console.log(`🎤 Parseado: "${text}" → Monto: ${monto}, Categoría: ${categoria}`);
 
   return {
     monto: monto || 0,
