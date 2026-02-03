@@ -57,6 +57,26 @@ export const useAuth = () => {
 };
 
 /**
+ * Normaliza un objeto de MongoDB para usar 'id' en lugar de '_id'
+ * Esto permite que el frontend funcione de forma consistente
+ */
+const normalizeMongoObject = (obj) => {
+  if (!obj) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(item => normalizeMongoObject(item));
+  }
+  if (typeof obj === 'object') {
+    const normalized = { ...obj };
+    // Convertir _id a id si existe
+    if (normalized._id && !normalized.id) {
+      normalized.id = normalized._id;
+    }
+    return normalized;
+  }
+  return obj;
+};
+
+/**
  * AuthProvider - Proveedor del contexto de autenticación
  */
 export const AuthProvider = ({ children }) => {
@@ -89,28 +109,41 @@ export const AuthProvider = ({ children }) => {
         if (token && savedSession) {
           const { perfilId } = JSON.parse(savedSession);
           
-          console.log('🔄 Cargando sesión desde backend...');
+          console.log('🔄 Cargando sesión desde backend MongoDB...');
+          console.log('🔑 Token encontrado:', token ? 'Sí' : 'No');
           
-          // Obtener usuario del backend
-          const userData = await apiService.auth.me();
-          console.log('✅ Usuario cargado:', userData);
+          try {
+            // Obtener usuario del backend (ya viene normalizado del apiService)
+            const userData = await apiService.auth.me();
+            console.log('✅ Usuario cargado:', userData);
+            
+            // Backend MongoDB devuelve 'usuario', apiService ya normaliza _id a id
+            const user = userData.usuario || userData.user || userData;
+            console.log('👤 User ID:', user?.id);
+            setCurrentUser(user);
           
-          setCurrentUser(userData.user);
-          
-          // Obtener perfiles del backend
-          const perfilesData = await apiService.perfiles.getAll();
-          console.log('✅ Perfiles cargados:', perfilesData);
-          
-          setPerfiles(perfilesData);
-          
-          // Establecer perfil activo
-          const perfil = perfilesData.find(p => p.id === perfilId) || perfilesData[0];
-          if (perfil) {
-            setCurrentPerfil(perfil);
+            // Obtener perfiles del backend (ya viene normalizado del apiService)
+            const perfilesData = await apiService.perfiles.getAll();
+            console.log('✅ Perfiles cargados:', perfilesData);
+            console.log('📋 Primer perfil ID:', perfilesData[0]?.id);
+            
+            setPerfiles(perfilesData);
+            
+            // Establecer perfil activo
+            const perfil = perfilesData.find(p => p.id === perfilId) || perfilesData[0];
+            if (perfil) {
+              console.log('✅ Perfil activo:', perfil.id, perfil.nombre);
+              setCurrentPerfil(perfil);
+            }
+          } catch (sessionError) {
+            console.error('❌ Error al cargar sesión (token inválido?):', sessionError.message);
+            // Token inválido o expirado - limpiar sesión
+            await AsyncStorage.removeItem('authToken');
+            await AsyncStorage.removeItem('finaizen_session');
           }
         }
       } catch (error) {
-        console.error('❌ Error al cargar sesión:', error);
+        console.error('❌ Error general al cargar sesión:', error);
         await AsyncStorage.removeItem('authToken');
         await AsyncStorage.removeItem('finaizen_session');
       } finally {
@@ -155,28 +188,33 @@ export const AuthProvider = ({ children }) => {
       
       console.log('✅ Login exitoso:', result);
       
-      if (result.user) {
-        setCurrentUser(result.user);
+      // Backend MongoDB devuelve 'usuario', apiService ya normaliza _id a id
+      const userData = result.usuario || result.user;
+      console.log('👤 User data ID:', userData?.id);
+      
+      if (userData) {
+        setCurrentUser(userData);
         
         // Guardar token
         if (result.token) {
           await AsyncStorage.setItem('authToken', result.token);
         }
         
-        // Obtener perfiles del usuario
+        // Obtener perfiles del usuario (ya viene normalizado del apiService)
         const perfilesData = await apiService.perfiles.getAll();
+        console.log('📋 Perfiles obtenidos, primer ID:', perfilesData[0]?.id);
         setPerfiles(perfilesData);
         
         if (perfilesData.length > 0) {
           setCurrentPerfil(perfilesData[0]);
           
           await AsyncStorage.setItem('finaizen_session', JSON.stringify({
-            userId: result.user.id,
+            userId: userData.id,
             perfilId: perfilesData[0].id
           }));
         }
         
-        return { success: true, user: result.user };
+        return { success: true, user: userData };
       }
       
       return { success: false, message: 'Error al iniciar sesión' };
@@ -249,7 +287,8 @@ export const AuthProvider = ({ children }) => {
    * Cambiar perfil activo
    */
   const cambiarPerfil = async (perfilId) => {
-    const perfil = perfiles.find(p => p.id === perfilId);
+    // Soportar tanto _id (MongoDB) como id (PostgreSQL)
+    const perfil = perfiles.find(p => (p._id || p.id) === perfilId);
     if (perfil) {
       setCurrentPerfil(perfil);
       

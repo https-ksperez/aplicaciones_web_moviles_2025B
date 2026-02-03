@@ -177,14 +177,12 @@ export default function RegistroVozScreen({ navigation }) {
         monto: parsedData.monto,
         descripcion: parsedData.descripcion,
         categoria: parsedData.categoria,
-        transaccionOrigenId: null,
         fechaEjecucion: new Date().toISOString(),
-        mes: new Date().getMonth() + 1,
-        anio: new Date().getFullYear()
       };
 
       if (!isDemoMode) {
-        await apiService.historial.create(currentPerfil.id, registroData);
+        const perfilId = currentPerfil?.id || currentPerfil?._id;
+        await apiService.historial.create(perfilId, registroData);
       }
 
       Alert.alert(

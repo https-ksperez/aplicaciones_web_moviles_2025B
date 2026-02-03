@@ -68,7 +68,17 @@ export default function HistorialScreen({ navigation }) {
         registros = demoHistorial;
       } else {
         // Modo real: obtener del backend
-        const response = await apiService.historial.getAll(currentPerfil.id);
+        // Usar id o _id como fallback para compatibilidad con MongoDB
+        const perfilId = currentPerfil?.id || currentPerfil?._id;
+        console.log('🔍 Perfil actual:', JSON.stringify(currentPerfil, null, 2));
+        console.log('🔑 Perfil ID para historial:', perfilId);
+        
+        if (!perfilId) {
+          console.error('❌ No se encontró ID del perfil');
+          throw new Error('No se pudo obtener el ID del perfil');
+        }
+        
+        const response = await apiService.historial.getAll(perfilId);
         console.log('📦 Respuesta historial:', response);
         
         // Asegurar que sea un array
@@ -178,7 +188,8 @@ export default function HistorialScreen({ navigation }) {
           onPress: async () => {
             try {
               if (!isDemoMode) {
-                await apiService.historial.delete(currentPerfil.id, registro.id);
+                const registroId = registro?.id || registro?._id;
+                await apiService.historial.delete(registroId);
               }
               setHistorial(prev => prev.filter(r => r.id !== registro.id));
               Alert.alert('Éxito', 'Registro eliminado');

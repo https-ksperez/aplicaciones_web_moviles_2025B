@@ -15,13 +15,15 @@ const getApiBaseUrl = () => {
     const debuggerHost = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
     if (debuggerHost) {
       const host = debuggerHost.split(':')[0]; // Obtener solo la IP sin el puerto
-      console.log('🔗 API conectando a:', `http://${host}:5000/api`);
-      return `http://${host}:5000/api`;
+      // Puerto 8001 para backend MongoDB
+      console.log('🔗 API conectando a:', `http://${host}:8001/api`);
+      return `http://${host}:8001/api`;
     }
   }
   
   // Fallback para producción o si no se detecta
-  return 'http://localhost:5000/api';
+  // Puerto 8001 para backend MongoDB
+  return 'http://localhost:8001/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -35,6 +37,7 @@ const toCamelCase = (str) => {
 
 /**
  * Convertir objeto de snake_case a camelCase recursivamente
+ * También normaliza _id de MongoDB a id
  */
 const convertKeysToCamelCase = (obj) => {
   if (obj === null || obj === undefined || typeof obj !== 'object') {
@@ -46,6 +49,12 @@ const convertKeysToCamelCase = (obj) => {
   }
   
   return Object.keys(obj).reduce((result, key) => {
+    // Convertir _id de MongoDB a id
+    if (key === '_id') {
+      result['id'] = obj[key];
+      return result;
+    }
+    
     const camelKey = toCamelCase(key);
     result[camelKey] = convertKeysToCamelCase(obj[key]);
     return result;
@@ -67,14 +76,20 @@ const getHeaders = async () => {
  * Manejo de respuestas del API
  */
 const handleResponse = async (response) => {
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch (e) {
+    throw new Error('Error al procesar respuesta del servidor');
+  }
   
   if (!response.ok) {
     if (response.status === 401) {
       await AsyncStorage.removeItem('authToken');
       // Aquí se manejará la redirección al login desde el AuthContext
     }
-    throw new Error(data.message || 'Error en la petición');
+    // El backend MongoDB usa 'mensaje' en español
+    throw new Error(data.mensaje || data.message || 'Error en la petición');
   }
   
   const result = data.data || data;
@@ -102,17 +117,17 @@ const request = async (endpoint, options = {}) => {
 
 // API Service exportado
 const apiService = {
-  // Auth
+  // Auth - Endpoints adaptados para backend MongoDB
   auth: {
-    login: (credentials) => request('/auth/login', {
+    login: (credentials) => request('/login', {
       method: 'POST',
       body: JSON.stringify(credentials)
     }),
-    register: (userData) => request('/auth/register', {
+    register: (userData) => request('/register', {
       method: 'POST',
       body: JSON.stringify(userData)
     }),
-    me: () => request('/auth/me'),
+    me: () => request('/me'),
     logout: async () => {
       await AsyncStorage.removeItem('authToken');
       await AsyncStorage.removeItem('finaizen_session');
@@ -135,25 +150,44 @@ const apiService = {
     })
   },
   
-  // Registros (Ingresos/Egresos)
-  registros: {
-    getAll: (perfilId) => request(`/registros?perfil_id=${perfilId}`),
-    create: (data) => request('/registros', {
+  // Ingresos - Endpoints adaptados para backend MongoDB
+  ingresos: {
+    getAll: (perfilId) => request(`/ingresos/${perfilId}`),
+    getById: (id) => request(`/ingresos/detalle/${id}`),
+    create: (perfilId, data) => request('/ingresos', {
       method: 'POST',
-      body: JSON.stringify(data)
+      body: JSON.stringify({ ...data, perfilId })
     }),
-    update: (id, data) => request(`/registros/${id}`, {
+    update: (perfilId, id, data) => request(`/ingresos/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
     }),
-    delete: (id) => request(`/registros/${id}`, {
+    delete: (perfilId, id) => request(`/ingresos/${id}`, {
       method: 'DELETE'
     })
   },
   
-  // Presupuestos
+  // Egresos - Endpoints adaptados para backend MongoDB
+  egresos: {
+    getAll: (perfilId) => request(`/egresos/${perfilId}`),
+    getById: (id) => request(`/egresos/detalle/${id}`),
+    create: (perfilId, data) => request('/egresos', {
+      method: 'POST',
+      body: JSON.stringify({ ...data, perfilId })
+    }),
+    update: (perfilId, id, data) => request(`/egresos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }),
+    delete: (perfilId, id) => request(`/egresos/${id}`, {
+      method: 'DELETE'
+    })
+  },
+  
+  // Presupuestos - Endpoints adaptados para backend MongoDB
   presupuestos: {
-    getAll: (perfilId) => request(`/presupuestos?perfil_id=${perfilId}`),
+    getAll: (perfilId) => request(`/presupuestos/${perfilId}`),
+    getById: (id) => request(`/presupuestos/detalle/${id}`),
     create: (data) => request('/presupuestos', {
       method: 'POST',
       body: JSON.stringify(data)
@@ -167,9 +201,10 @@ const apiService = {
     })
   },
   
-  // Planes de Ahorro
+  // Planes de Ahorro - Endpoints adaptados para backend MongoDB
   planesAhorro: {
-    getAll: (perfilId) => request(`/planes-ahorro?perfil_id=${perfilId}`),
+    getAll: (perfilId) => request(`/planes-ahorro/${perfilId}`),
+    getById: (id) => request(`/planes-ahorro/detalle/${id}`),
     create: (data) => request('/planes-ahorro', {
       method: 'POST',
       body: JSON.stringify(data)
@@ -178,80 +213,106 @@ const apiService = {
       method: 'PUT',
       body: JSON.stringify(data)
     }),
+    depositar: (id, monto) => request(`/planes-ahorro/${id}/depositar`, {
+      method: 'PUT',
+      body: JSON.stringify({ monto })
+    }),
     delete: (id) => request(`/planes-ahorro/${id}`, {
       method: 'DELETE'
     })
   },
   
-  // Deudas
+  // Deudas/Planes de Deuda - Endpoints adaptados para backend MongoDB
   deudas: {
-    getAll: (perfilId) => request(`/deudas?perfil_id=${perfilId}`),
-    create: (data) => request('/deudas', {
+    getAll: (perfilId) => request(`/planes-deuda/perfil/${perfilId}`),
+    getById: (id) => request(`/planes-deuda/${id}`),
+    estadisticas: (perfilId) => request(`/planes-deuda/estadisticas/${perfilId}`),
+    create: (data) => request('/planes-deuda', {
       method: 'POST',
       body: JSON.stringify(data)
     }),
-    update: (id, data) => request(`/deudas/${id}`, {
+    update: (id, data) => request(`/planes-deuda/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
     }),
-    delete: (id) => request(`/deudas/${id}`, {
+    registrarPago: (id, monto, nota) => request(`/planes-deuda/${id}/pago`, {
+      method: 'POST',
+      body: JSON.stringify({ monto, nota })
+    }),
+    delete: (id) => request(`/planes-deuda/${id}`, {
       method: 'DELETE'
     })
   },
-  
-  // Logros
-  logros: {
-    getAll: (perfilId) => request(`/logros?perfil_id=${perfilId}`)
+
+  // Historial - Registro de transacciones
+  historial: {
+    getAll: (perfilId) => request(`/historial/${perfilId}`),
+    getById: (id) => request(`/historial/detalle/${id}`),
+    getResumen: (perfilId, mes, anio) => {
+      let url = `/historial/${perfilId}/resumen`;
+      const params = [];
+      if (mes) params.push(`mes=${mes}`);
+      if (anio) params.push(`anio=${anio}`);
+      if (params.length > 0) url += `?${params.join('&')}`;
+      return request(url);
+    },
+    create: (perfilId, data) => request(`/historial/${perfilId}`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+    update: (id, data) => request(`/historial/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }),
+    delete: (id) => request(`/historial/${id}`, {
+      method: 'DELETE'
+    })
   },
-  
+
+  // Logros - Sistema de logros/achievements
+  logros: {
+    getAll: (perfilId) => request(`/logros/${perfilId}`),
+    getById: (id) => request(`/logros/detalle/${id}`),
+    create: (data) => request('/logros', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+    update: (id, data) => request(`/logros/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }),
+    desbloquear: (id) => request(`/logros/${id}/desbloquear`, {
+      method: 'PUT'
+    }),
+    actualizarProgreso: (id, progreso) => request(`/logros/${id}/progreso`, {
+      method: 'PUT',
+      body: JSON.stringify({ progreso })
+    }),
+    delete: (id) => request(`/logros/${id}`, {
+      method: 'DELETE'
+    })
+  },
+
   // Notificaciones
   notificaciones: {
     getAll: () => request('/notificaciones'),
-    markAsRead: (id) => request(`/notificaciones/${id}/read`, {
+    getNoLeidas: () => request('/notificaciones?leidas=false'),
+    getConteoNoLeidas: () => request('/notificaciones/no-leidas/count'),
+    getById: (id) => request(`/notificaciones/${id}`),
+    create: (data) => request('/notificaciones', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+    marcarLeida: (id) => request(`/notificaciones/${id}/leer`, {
       method: 'PUT'
-    })
-  },
-  
-  // Historial de transacciones ejecutadas (ruta anidada en perfil)
-  historial: {
-    getAll: (perfilId) => request(`/perfiles/${perfilId}/historial`),
-    create: (perfilId, data) => request(`/perfiles/${perfilId}/historial`, {
-      method: 'POST',
-      body: JSON.stringify(data)
     }),
-    delete: (perfilId, id) => request(`/perfiles/${perfilId}/historial/${id}`, {
+    marcarTodasLeidas: () => request('/notificaciones/leer-todas', {
+      method: 'PUT'
+    }),
+    deleteLeidas: () => request('/notificaciones/leidas', {
       method: 'DELETE'
-    })
-  },
-  
-  // Ingresos programados (ruta anidada en perfil)
-  ingresos: {
-    getAll: (perfilId) => request(`/perfiles/${perfilId}/ingresos`),
-    create: (perfilId, data) => request(`/perfiles/${perfilId}/ingresos`, {
-      method: 'POST',
-      body: JSON.stringify(data)
     }),
-    update: (perfilId, id, data) => request(`/perfiles/${perfilId}/ingresos/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    }),
-    delete: (perfilId, id) => request(`/perfiles/${perfilId}/ingresos/${id}`, {
-      method: 'DELETE'
-    })
-  },
-  
-  // Egresos programados (ruta anidada en perfil)
-  egresos: {
-    getAll: (perfilId) => request(`/perfiles/${perfilId}/egresos`),
-    create: (perfilId, data) => request(`/perfiles/${perfilId}/egresos`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
-    update: (perfilId, id, data) => request(`/perfiles/${perfilId}/egresos/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    }),
-    delete: (perfilId, id) => request(`/perfiles/${perfilId}/egresos/${id}`, {
+    delete: (id) => request(`/notificaciones/${id}`, {
       method: 'DELETE'
     })
   }

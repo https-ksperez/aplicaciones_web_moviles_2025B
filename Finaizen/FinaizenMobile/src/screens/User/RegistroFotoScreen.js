@@ -153,14 +153,15 @@ export default function RegistroFotoScreen({ navigation }) {
         monto: parsedData.monto,
         descripcion: parsedData.descripcion || parsedData.comercio || 'Compra',
         categoria: parsedData.categoria,
-        transaccionOrigenId: null,
         fechaEjecucion: new Date().toISOString(),
-        mes: new Date().getMonth() + 1,
-        anio: new Date().getFullYear()
       };
 
+      console.log('📤 Enviando registro:', registroData);
+      console.log('📋 Perfil ID:', currentPerfil?.id || currentPerfil?._id);
+
       if (!isDemoMode) {
-        await apiService.historial.create(currentPerfil.id, registroData);
+        const perfilId = currentPerfil?.id || currentPerfil?._id;
+        await apiService.historial.create(perfilId, registroData);
       }
 
       Alert.alert(
