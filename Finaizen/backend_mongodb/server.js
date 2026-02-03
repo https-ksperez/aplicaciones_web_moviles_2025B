@@ -1,6 +1,6 @@
 require("dotenv").config();
 const express = require("express");
-// const cors = require("cors"); // Solo necesario si usas frontend (React, etc.)
+const cors = require("cors"); // Necesario para conectar frontend/móvil
 
 const app = express();
 const puerto = process.env.PORT || 8001;
@@ -9,7 +9,7 @@ const puerto = process.env.PORT || 8001;
 require("./config/mongoose.config");
 
 // Middlewares globales
-// app.use(cors()); // Descomentar si conectas un frontend
+app.use(cors()); // Habilitar CORS para la app móvil
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -20,6 +20,10 @@ require("./routes/ingreso.routes")(app);
 require("./routes/egreso.routes")(app);
 require("./routes/presupuesto.routes")(app);
 require("./routes/planAhorro.routes")(app);
+require("./routes/planDeuda.routes")(app);
+require("./routes/historial.routes")(app);
+require("./routes/logro.routes")(app);
+require("./routes/notificacion.routes")(app);
 
 // Ruta de prueba/health check
 app.get("/", (req, res) => {
@@ -32,7 +36,8 @@ app.get("/", (req, res) => {
       ingresos: "/api/ingresos",
       egresos: "/api/egresos",
       presupuestos: "/api/presupuestos",
-      planesAhorro: "/api/planes-ahorro"
+      planesAhorro: "/api/planes-ahorro",
+      planesDeuda: "/api/planes-deuda"
     }
   });
 });

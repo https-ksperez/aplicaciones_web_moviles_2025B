@@ -54,9 +54,10 @@ export default function AdministrarRegistrosScreen({ navigation }) {
         await new Promise(resolve => setTimeout(resolve, 500));
         setRegistros(demoRegistros);
       } else {
+        const perfilId = currentPerfil?.id || currentPerfil?._id;
         const [ingresos, egresos] = await Promise.all([
-          apiService.ingresos.getAll(currentPerfil.id),
-          apiService.egresos.getAll(currentPerfil.id)
+          apiService.ingresos.getAll(perfilId),
+          apiService.egresos.getAll(perfilId)
         ]);
         setRegistros({ ingresos: ingresos || [], egresos: egresos || [] });
       }
@@ -83,7 +84,9 @@ export default function AdministrarRegistrosScreen({ navigation }) {
     try {
       if (!isDemoMode) {
         const api = tipo === 'ingresos' ? apiService.ingresos : apiService.egresos;
-        await api.update(currentPerfil.id, registro.id, { activo: !registro.activo });
+        const perfilId = currentPerfil?.id || currentPerfil?._id;
+        const registroId = registro?.id || registro?._id;
+        await api.update(perfilId, registroId, { activo: !registro.activo });
       }
       
       setRegistros(prev => ({
@@ -110,7 +113,9 @@ export default function AdministrarRegistrosScreen({ navigation }) {
             try {
               if (!isDemoMode) {
                 const api = tipo === 'ingresos' ? apiService.ingresos : apiService.egresos;
-                await api.delete(currentPerfil.id, registro.id);
+                const perfilId = currentPerfil?.id || currentPerfil?._id;
+                const registroId = registro?.id || registro?._id;
+                await api.delete(perfilId, registroId);
               }
               setRegistros(prev => ({
                 ...prev,

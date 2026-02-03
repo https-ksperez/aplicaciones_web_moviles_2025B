@@ -73,7 +73,8 @@ export default function DashboardScreen({ navigation }) {
         ];
       } else {
         // Obtener historial real de la API
-        const response = await apiService.historial.getAll(currentPerfil.id);
+        const perfilId = currentPerfil?.id || currentPerfil?._id;
+        const response = await apiService.historial.getAll(perfilId);
         historial = Array.isArray(response) ? response : [];
       }
 

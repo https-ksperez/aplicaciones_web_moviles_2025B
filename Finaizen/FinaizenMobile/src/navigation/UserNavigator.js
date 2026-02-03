@@ -128,13 +128,11 @@ export default function UserNavigator() {
       monto: parseFloat(data.monto),
       descripcion: data.descripcion,
       categoria: data.categoria || (data.tipo === 'ingreso' ? 'Otros' : 'Otros'),
-      transaccionOrigenId: null,
       fechaEjecucion: new Date().toISOString(),
-      mes: new Date().getMonth() + 1,
-      anio: new Date().getFullYear()
     };
     
-    await apiService.historial.create(currentPerfil.id, registroData);
+    const perfilId = currentPerfil?.id || currentPerfil?._id;
+    await apiService.historial.create(perfilId, registroData);
   };
 
   // Handlers para las opciones del menú rápido
