@@ -11,10 +11,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import Button from '../../components/ui/Button';
-import Input from '../../components/ui/Input';
-import Card from '../../components/ui/Card';
-import { useAuth } from '../../context/AuthContext';
+import Button from '../../components/ui/Button.jsx';
+import Input from '../../components/ui/Input.jsx';
+import Card from '../../components/ui/Card.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { COLORS } from '../../utils/constants';
 
 /**

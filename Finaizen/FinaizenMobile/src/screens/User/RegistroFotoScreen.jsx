@@ -13,8 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
-import Card from '../../components/ui/Card';
-import { useAuth } from '../../context/AuthContext';
+import Card from '../../components/ui/Card.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 import apiService from '../../services/apiService';
 import { COLORS } from '../../utils/constants';
 import { formatCurrency } from '../../utils/helpers';

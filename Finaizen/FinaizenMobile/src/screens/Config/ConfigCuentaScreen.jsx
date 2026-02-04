@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Card from '../../components/ui/Card';
-import { useAuth } from '../../context/AuthContext';
+import Card from '../../components/ui/Card.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function ConfigCuentaScreen({ navigation }) {
   const { currentUser, logout } = useAuth();

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import TransactionForm from '../../components/forms/TransactionForm';
-import { useAuth } from '../../context/AuthContext';
+import TransactionForm from '../../components/forms/TransactionForm.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
-export default function NuevoEgresoScreen({ navigation, route }) {
+export default function NuevoIngresoScreen({ navigation, route }) {
   const { user } = useAuth();
   const [initialData, setInitialData] = useState(null);
   
@@ -19,24 +19,22 @@ export default function NuevoEgresoScreen({ navigation, route }) {
         descripcion: ocrData.descripcion || '',
         monto: ocrData.monto || '',
         categoria: ocrData.categoria || '',
-        clasificacion: ocrData.clasificacion || 'necesidad',
       });
     } else if (voiceData) {
       setInitialData({
         descripcion: voiceData.descripcion || '',
         monto: voiceData.monto || '',
         categoria: voiceData.categoria || '',
-        clasificacion: voiceData.clasificacion || 'necesidad',
       });
     }
   }, [ocrData, voiceData]);
 
   const handleSuccess = (result) => {
     Alert.alert(
-      '✅ Egreso Guardado',
+      '✅ Ingreso Guardado',
       result.frecuencia === 'ocasional'
-        ? 'El egreso se ha registrado correctamente en tu historial.'
-        : 'El egreso recurrente se ha configurado correctamente.',
+        ? 'El ingreso se ha registrado correctamente en tu historial.'
+        : 'El ingreso recurrente se ha configurado correctamente.',
       [
         {
           text: 'Ver Historial',
@@ -57,7 +55,7 @@ export default function NuevoEgresoScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <TransactionForm
-        type="egreso"
+        type="ingreso"
         perfilId={user?.perfilId}
         initialData={initialData}
         onSuccess={handleSuccess}

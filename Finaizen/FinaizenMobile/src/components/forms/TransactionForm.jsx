@@ -14,10 +14,10 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext.jsx';
 import apiService from '../../services/apiService';
 import { COLORS } from '../../utils/constants';
-import Card from '../ui/Card';
+import Card from '../ui/Card.jsx';
 
 // Categorías
 const CATEGORIAS_INGRESO = [

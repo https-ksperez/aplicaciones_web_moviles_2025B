@@ -13,9 +13,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Picker } from '@react-native-picker/picker';
-import Card from '../../components/ui/Card';
+import Card from '../../components/ui/Card.jsx';
 import { HistorialItem } from '../../components/historial';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext.jsx';
 import apiService from '../../services/apiService';
 import { COLORS } from '../../utils/constants';
 import { formatCurrency } from '../../utils/helpers';
