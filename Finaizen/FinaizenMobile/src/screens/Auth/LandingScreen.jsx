@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import Button from '../../components/ui/Button';
+import Button from '../../components/ui/Button.jsx';
 import { COLORS } from '../../utils/constants';
 
 const { width } = Dimensions.get('window');

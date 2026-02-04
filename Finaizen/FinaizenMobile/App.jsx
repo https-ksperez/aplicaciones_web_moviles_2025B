@@ -1,6 +1,6 @@
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AuthProvider } from './src/context/AuthContext';
-import AppNavigator from './src/navigation/AppNavigator';
+import { AuthProvider } from './src/context/AuthContext.jsx';
+import AppNavigator from './src/navigation/AppNavigator.jsx';
 
 /**
  * App - Componente principal de Finaizen Mobile

@@ -1,11 +1,11 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext.jsx';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { COLORS } from '../utils/constants';
 
-import AuthNavigator from './AuthNavigator';
-import UserNavigator from './UserNavigator';
+import AuthNavigator from './AuthNavigator.jsx';
+import UserNavigator from './UserNavigator.jsx';
 
 const Stack = createNativeStackNavigator();
 

@@ -1,1 +1,1 @@
-export { default as HistorialItem } from './HistorialItem';
+export { default as HistorialItem } from './HistorialItem.jsx';

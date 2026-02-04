@@ -1,2 +1,2 @@
-export { default as QuickActionButton } from './QuickActionButton';
-export { default as QuickExpenseModal } from './QuickExpenseModal';
+export { default as QuickActionButton } from './QuickActionButton.jsx';
+export { default as QuickExpenseModal } from './QuickExpenseModal.jsx';

@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Text, View, StyleSheet, TouchableOpacity, Modal, Pressable, Alert } from 'react-native';
 import { COLORS } from '../utils/constants';
 import { QuickExpenseModal } from '../components/quick-action';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext.jsx';
 import apiService from '../services/apiService';
 
 // Screens
