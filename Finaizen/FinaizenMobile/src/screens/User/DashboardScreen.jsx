@@ -10,35 +10,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import Card from '../../components/ui/Card.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import apiService from '../../services/apiService';
 import { COLORS } from '../../utils/constants';
-import { formatCurrency } from '../../utils/helpers';
-
-// Mapeo de categorías a emojis
-const CATEGORIA_EMOJI = {
-  'Salario': '💰',
-  'Freelance': '💻',
-  'Bonos': '🎁',
-  'Inversiones': '📈',
-  'Ventas': '🛍️',
-  'Regalos': '🎀',
-  'Alimentación': '🍽️',
-  'Transporte': '🚗',
-  'Vivienda': '🏠',
-  'Servicios': '📱',
-  'Entretenimiento': '🎬',
-  'Salud': '💊',
-  'Educación': '📚',
-  'Ropa': '👕',
-  'Tecnología': '💻',
-  'Marketing': '📣',
-  'Otros': '📋',
-};
+import { BalanceCard, QuickActionsGrid, RecentTransactionsList } from '../../components/dashboard';
 
 /**
- * DashboardScreen - Pantalla principal del usuario
+ * DashboardScreen - Pantalla principal del usuario (Refactorizada)
+ * Usa componentes reutilizables para mejorar mantenibilidad
  * Muestra resumen financiero, balance, y accesos rápidos
  */
 export default function DashboardScreen({ navigation }) {
@@ -135,19 +114,33 @@ export default function DashboardScreen({ navigation }) {
     setRefreshing(false);
   };
 
-  // Obtener emoji para categoría
-  const getCategoriaEmoji = (categoria) => {
-    return CATEGORIA_EMOJI[categoria] || '📋';
-  };
-
-  // Formatear fecha
-  const formatFecha = (fechaStr) => {
-    const fecha = new Date(fechaStr);
-    return fecha.toLocaleDateString('es-ES', { 
-      day: '2-digit', 
-      month: 'short' 
-    });
-  };
+  // Definir acciones rápidas
+  const quickActions = [
+    {
+      icon: '💵',
+      label: 'Ingreso',
+      color: COLORS.success,
+      onPress: () => navigation.navigate('NuevoIngreso')
+    },
+    {
+      icon: '💸',
+      label: 'Egreso',
+      color: COLORS.danger,
+      onPress: () => navigation.navigate('NuevoEgreso')
+    },
+    {
+      icon: '📋',
+      label: 'Historial',
+      color: '#6366f1',
+      onPress: () => navigation.navigate('Historial')
+    },
+    {
+      icon: '⚙️',
+      label: 'Gestionar',
+      color: '#8b5cf6',
+      onPress: () => navigation.navigate('AdministrarRegistros')
+    },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -177,125 +170,30 @@ export default function DashboardScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Balance Card */}
-        <Card style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Balance Total</Text>
-          <Text style={styles.balanceAmount}>
-            {formatCurrency(dashboardData.balance)}
-          </Text>
-          <View style={styles.balanceDetails}>
-            <View style={styles.balanceItem}>
-              <Text style={styles.balanceItemIcon}>📈</Text>
-              <View>
-                <Text style={styles.balanceItemLabel}>Ingresos</Text>
-                <Text style={styles.balanceItemValue}>
-                  {formatCurrency(dashboardData.ingresos)}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.balanceDivider} />
-            <View style={styles.balanceItem}>
-              <Text style={styles.balanceItemIcon}>📉</Text>
-              <View>
-                <Text style={styles.balanceItemLabel}>Egresos</Text>
-                <Text style={[styles.balanceItemValue, styles.egresoValue]}>
-                  {formatCurrency(dashboardData.egresos)}
-                </Text>
-              </View>
-            </View>
+        {/* Componente de Balance */}
+        <BalanceCard
+          balance={dashboardData.balance}
+          ingresos={dashboardData.ingresos}
+          egresos={dashboardData.egresos}
+        />
+
+        {/* Componente de Acciones Rápidas */}
+        <QuickActionsGrid actions={quickActions} />
+
+        {/* Componente de Transacciones Recientes */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Cargando movimientos...</Text>
           </View>
-        </Card>
+        ) : (
+          <RecentTransactionsList
+            transactions={ultimosMovimientos}
+            onViewAll={() => navigation.navigate('Historial')}
+          />
+        )}
 
-        {/* Acciones Rápidas */}
-        <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity 
-            style={styles.quickActionBtn}
-            onPress={() => navigation.navigate('NuevoIngreso')}
-          >
-            <View style={[styles.quickActionIcon, styles.ingresoIcon]}>
-              <Text style={styles.quickActionEmoji}>💵</Text>
-            </View>
-            <Text style={styles.quickActionText}>Ingreso</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.quickActionBtn}
-            onPress={() => navigation.navigate('NuevoEgreso')}
-          >
-            <View style={[styles.quickActionIcon, styles.egresoIcon]}>
-              <Text style={styles.quickActionEmoji}>💸</Text>
-            </View>
-            <Text style={styles.quickActionText}>Egreso</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.quickActionBtn}
-            onPress={() => navigation.navigate('Historial')}
-          >
-            <View style={[styles.quickActionIcon, styles.historialIcon]}>
-              <Text style={styles.quickActionEmoji}>📋</Text>
-            </View>
-            <Text style={styles.quickActionText}>Historial</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.quickActionBtn}
-            onPress={() => navigation.navigate('AdministrarRegistros')}
-          >
-            <View style={[styles.quickActionIcon, styles.adminIcon]}>
-              <Text style={styles.quickActionEmoji}>⚙️</Text>
-            </View>
-            <Text style={styles.quickActionText}>Gestionar</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Últimos Movimientos */}
-        <View style={styles.movimientosHeader}>
-          <Text style={styles.sectionTitle}>Últimos Movimientos</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Historial')}>
-            <Text style={styles.verTodo}>Ver todo →</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <Card style={styles.movimientosCard}>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={COLORS.primary} />
-              <Text style={styles.loadingText}>Cargando...</Text>
-            </View>
-          ) : ultimosMovimientos.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No hay movimientos aún</Text>
-              <Text style={styles.emptySubtext}>Registra tu primer ingreso o egreso</Text>
-            </View>
-          ) : (
-            ultimosMovimientos.map((mov, index) => (
-              <View key={mov.id}>
-                <View style={styles.movimientoItem}>
-                  <View style={styles.movimientoLeft}>
-                    <Text style={styles.movimientoCategoria}>{getCategoriaEmoji(mov.categoria)}</Text>
-                    <View>
-                      <Text style={styles.movimientoDesc}>{mov.descripcion}</Text>
-                      <Text style={styles.movimientoFecha}>{formatFecha(mov.fechaEjecucion)}</Text>
-                    </View>
-                  </View>
-                  <Text style={[
-                    styles.movimientoMonto,
-                    mov.tipo === 'ingreso' ? styles.montoIngreso : styles.montoEgreso
-                  ]}>
-                    {mov.tipo === 'ingreso' ? '+' : '-'}{formatCurrency(mov.monto)}
-                  </Text>
-                </View>
-                {index < ultimosMovimientos.length - 1 && (
-                  <View style={styles.movimientoDivider} />
-                )}
-              </View>
-            ))
-          )}
-        </Card>
-
-        {/* Cerrar sesión (temporal) */}
+        {/* Botón de cerrar sesión */}
         <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
           <Text style={styles.logoutText}>Cerrar Sesión</Text>
         </TouchableOpacity>

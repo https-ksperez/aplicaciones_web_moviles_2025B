@@ -124,15 +124,21 @@ export const AuthProvider = ({ children }) => {
           
             // Obtener perfiles del backend (ya viene normalizado del apiService)
             const perfilesData = await apiService.perfiles.getAll();
-            console.log('✅ Perfiles cargados:', perfilesData);
-            console.log('📋 Primer perfil ID:', perfilesData[0]?.id);
+            console.log('✅ Perfiles cargados:', perfilesData.length);
             
-            setPerfiles(perfilesData);
+            // Ordenar perfiles: "Personal" primero
+            const perfilesOrdenados = perfilesData.sort((a, b) => {
+              if (a.nombre === 'Personal') return -1;
+              if (b.nombre === 'Personal') return 1;
+              return 0;
+            });
+            
+            setPerfiles(perfilesOrdenados);
             
             // Establecer perfil activo
-            const perfil = perfilesData.find(p => p.id === perfilId) || perfilesData[0];
+            const perfil = perfilesOrdenados.find(p => p.id === perfilId) || perfilesOrdenados[0];
             if (perfil) {
-              console.log('✅ Perfil activo:', perfil.id, perfil.nombre);
+              console.log('✅ Perfil activo:', perfil.nombre, 'ID:', perfil.id);
               setCurrentPerfil(perfil);
             }
           } catch (sessionError) {
@@ -202,15 +208,25 @@ export const AuthProvider = ({ children }) => {
         
         // Obtener perfiles del usuario (ya viene normalizado del apiService)
         const perfilesData = await apiService.perfiles.getAll();
-        console.log('📋 Perfiles obtenidos, primer ID:', perfilesData[0]?.id);
-        setPerfiles(perfilesData);
+        console.log('📋 Perfiles obtenidos:', perfilesData.length);
         
-        if (perfilesData.length > 0) {
-          setCurrentPerfil(perfilesData[0]);
+        // Ordenar perfiles: "Personal" primero
+        const perfilesOrdenados = perfilesData.sort((a, b) => {
+          if (a.nombre === 'Personal') return -1;
+          if (b.nombre === 'Personal') return 1;
+          return 0;
+        });
+        
+        setPerfiles(perfilesOrdenados);
+        
+        if (perfilesOrdenados.length > 0) {
+          const primerPerfil = perfilesOrdenados[0];
+          console.log('✅ Perfil seleccionado:', primerPerfil.nombre, 'ID:', primerPerfil.id);
+          setCurrentPerfil(primerPerfil);
           
           await AsyncStorage.setItem('finaizen_session', JSON.stringify({
             userId: userData.id,
-            perfilId: perfilesData[0].id
+            perfilId: primerPerfil.id
           }));
         }
         

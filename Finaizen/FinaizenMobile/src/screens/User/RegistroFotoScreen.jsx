@@ -1,23 +1,25 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
-  Image,
   ScrollView,
-  Platform
+  Platform,
+  KeyboardAvoidingView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
-import Card from '../../components/ui/Card.jsx';
+import {
+  CameraOptions,
+  ImagePreview,
+  ReceiptData
+} from '../../components/camera';
 import { useAuth } from '../../context/AuthContext.jsx';
 import apiService from '../../services/apiService';
 import { COLORS } from '../../utils/constants';
-import { formatCurrency } from '../../utils/helpers';
 
 // Importar el servicio OCR
 import { processReceiptImage, parseReceiptText } from '../../services/ocrService';
@@ -197,149 +199,41 @@ export default function RegistroFotoScreen({ navigation }) {
         <Text style={styles.title}>📷 Escanear Recibo</Text>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* Instrucciones */}
-        <Card style={styles.instructionsCard}>
-          <Text style={styles.instructionsTitle}>¿Cómo funciona?</Text>
-          <Text style={styles.instructionsText}>
-            1. Toma una foto o selecciona una imagen de tu recibo{'\n'}
-            2. Presiona "Procesar" para extraer la información{'\n'}
-            3. Verifica los datos y guarda el registro
-          </Text>
-        </Card>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
+      >
+        <ScrollView 
+          style={styles.content} 
+          contentContainerStyle={styles.contentContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Opciones de cámara */}
+          {!image && (
+            <CameraOptions
+              onTakePhoto={takePhoto}
+              onPickImage={pickImage}
+            />
+          )}
 
-        {/* Área de imagen */}
-        <Card style={styles.imageCard}>
-          {image ? (
-            <View style={styles.imageContainer}>
-              <Image
-                source={{ uri: image.uri }}
-                style={styles.previewImage}
-                resizeMode="contain"
-              />
-              <TouchableOpacity
-                style={styles.removeImageButton}
-                onPress={handleReset}
-              >
-                <Text style={styles.removeImageText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.placeholderContainer}>
-              <Text style={styles.placeholderEmoji}>📄</Text>
-              <Text style={styles.placeholderText}>
-                Selecciona o toma una foto del recibo
-              </Text>
+          {/* Vista previa de imagen */}
+          <ImagePreview
+            image={image}
+            onRemove={handleReset}
+            onAnalyze={processImage}
+            processing={processing}
+          />
+
+          {/* Error */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>⚠️ {error}</Text>
             </View>
           )}
-        </Card>
 
-        {/* Botones de captura */}
-        {!image && (
-          <View style={styles.captureButtons}>
-            <TouchableOpacity
-              style={styles.captureButton}
-              onPress={takePhoto}
-            >
-              <Text style={styles.captureButtonEmoji}>📷</Text>
-              <Text style={styles.captureButtonText}>Tomar Foto</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.captureButton}
-              onPress={pickImage}
-            >
-              <Text style={styles.captureButtonEmoji}>🖼️</Text>
-              <Text style={styles.captureButtonText}>Galería</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Botón procesar */}
-        {image && !parsedData && (
-          <TouchableOpacity
-            style={[styles.processButton, processing && styles.buttonDisabled]}
-            onPress={processImage}
-            disabled={processing}
-          >
-            {processing ? (
-              <>
-                <ActivityIndicator color="#fff" style={{ marginRight: 8 }} />
-                <Text style={styles.processButtonText}>Procesando...</Text>
-              </>
-            ) : (
-              <Text style={styles.processButtonText}>🔍 Procesar Imagen</Text>
-            )}
-          </TouchableOpacity>
-        )}
-
-        {/* Error */}
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>⚠️ {error}</Text>
-          </View>
-        )}
-
-        {/* Resultado parseado */}
-        {parsedData && (
-          <Card style={[
-            styles.resultCard,
-            parsedData.tipo === 'ingreso' ? styles.resultCardIngreso : styles.resultCardEgreso
-          ]}>
-            <Text style={styles.resultTitle}>Datos Detectados</Text>
-            
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Tipo:</Text>
-              <Text style={[
-                styles.resultValue,
-                { color: parsedData.tipo === 'ingreso' ? COLORS.success : COLORS.danger }
-              ]}>
-                {parsedData.tipo === 'ingreso' ? '💰 Ingreso' : '💸 Egreso'}
-              </Text>
-            </View>
-            
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Monto:</Text>
-              <Text style={styles.resultValueBig}>
-                {formatCurrency(parsedData.monto)}
-              </Text>
-            </View>
-            
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Comercio:</Text>
-              <Text style={styles.resultValue}>{parsedData.comercio || parsedData.descripcion || '-'}</Text>
-            </View>
-            
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>Categoría:</Text>
-              <Text style={styles.resultValue}>{parsedData.categoria}</Text>
-            </View>
-            
-            <View style={styles.confidenceContainer}>
-              <Text style={styles.confidenceLabel}>
-                Confianza: {parsedData.confianza}%
-              </Text>
-              <View style={styles.confidenceBar}>
-                <View 
-                  style={[
-                    styles.confidenceFill,
-                    { width: `${parsedData.confianza}%` }
-                  ]} 
-                />
-              </View>
-            </View>
-          </Card>
-        )}
-
-        {/* Texto extraído (colapsable) */}
-        {rawText && (
-          <Card style={styles.rawTextCard}>
-            <Text style={styles.rawTextTitle}>Texto Extraído</Text>
-            <Text style={styles.rawText} numberOfLines={10}>
-              {rawText}
-            </Text>
-          </Card>
-        )}
+          {/* Datos del recibo */}
+          <ReceiptData data={parsedData} rawText={rawText} />
+        </ScrollView>
 
         {/* Botones de acción */}
         {parsedData && (
@@ -355,17 +249,15 @@ export default function RegistroFotoScreen({ navigation }) {
             <TouchableOpacity
               style={[styles.saveButton, saving && styles.buttonDisabled]}
               onPress={handleSave}
-              disabled={saving || parsedData.monto <= 0}
+              disabled={saving || (parsedData && parsedData.monto <= 0)}
             >
-              {saving ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.saveButtonText}>✓ Guardar</Text>
-              )}
+              <Text style={styles.saveButtonText}>
+                {saving ? '⏳ Guardando...' : '✓ Guardar'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
-      </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -374,6 +266,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
+  },
+  flex: {
+    flex: 1,
   },
   header: {
     paddingHorizontal: 20,
@@ -397,202 +292,30 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
-    paddingBottom: 40,
-  },
-  instructionsCard: {
-    padding: 16,
-    marginBottom: 16,
-    backgroundColor: '#fef3c7',
-    borderColor: '#f59e0b',
-    borderWidth: 1,
-  },
-  instructionsTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#92400e',
-    marginBottom: 8,
-  },
-  instructionsText: {
-    fontSize: 14,
-    color: '#78350f',
-    lineHeight: 22,
-  },
-  imageCard: {
-    padding: 16,
-    marginBottom: 16,
-    minHeight: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageContainer: {
-    width: '100%',
-    position: 'relative',
-  },
-  previewImage: {
-    width: '100%',
-    height: 300,
-    borderRadius: 8,
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeImageText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  placeholderContainer: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  placeholderEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  placeholderText: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  captureButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  captureButton: {
-    flex: 1,
-    padding: 20,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-  },
-  captureButtonEmoji: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  captureButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.primary,
-  },
-  processButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: COLORS.primary,
-    marginBottom: 16,
-  },
-  processButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
+    paddingBottom: 100,
   },
   errorContainer: {
-    backgroundColor: '#fef2f2',
+    backgroundColor: '#fee2e2',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
   },
   errorText: {
-    color: COLORS.danger,
+    color: '#991b1b',
     fontSize: 14,
-    textAlign: 'center',
-  },
-  resultCard: {
-    padding: 16,
-    marginBottom: 16,
-  },
-  resultCardIngreso: {
-    backgroundColor: '#f0fdf4',
-    borderColor: COLORS.success,
-    borderWidth: 1,
-  },
-  resultCardEgreso: {
-    backgroundColor: '#fef2f2',
-    borderColor: COLORS.danger,
-    borderWidth: 1,
-  },
-  resultTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  resultRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  resultLabel: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  resultValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    flex: 1,
-    textAlign: 'right',
-  },
-  resultValueBig: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  confidenceContainer: {
-    marginTop: 16,
-  },
-  confidenceLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginBottom: 4,
-  },
-  confidenceBar: {
-    height: 8,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  confidenceFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: 4,
-  },
-  rawTextCard: {
-    padding: 16,
-    marginBottom: 16,
-    backgroundColor: '#f9fafb',
-  },
-  rawTextTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: 8,
-  },
-  rawText: {
-    fontSize: 12,
-    color: '#374151',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   actionButtons: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   retryButton: {
     flex: 1,

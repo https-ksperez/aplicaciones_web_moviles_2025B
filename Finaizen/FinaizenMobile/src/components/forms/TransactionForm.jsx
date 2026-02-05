@@ -4,9 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TextInput,
   TouchableOpacity,
-  Switch,
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -18,6 +16,17 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import apiService from '../../services/apiService';
 import { COLORS } from '../../utils/constants';
 import Card from '../ui/Card.jsx';
+import {
+  AmountField,
+  DescriptionField,
+  CategorySelector,
+  FrequencySelector,
+  WeekDaySelector,
+  MonthDaySelector,
+  DateField,
+  NotificationSwitch,
+  ClassificationSelector
+} from './fields';
 
 // Categorías
 const CATEGORIAS_INGRESO = [
@@ -39,10 +48,9 @@ const FRECUENCIAS = [
   { value: 'anual', label: 'Anual', icon: '📊' },
 ];
 
-const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-
 /**
- * TransactionForm - Formulario completo para Ingresos/Egresos
+ * TransactionForm - Formulario completo para Ingresos/Egresos (Refactorizado)
+ * Usa componentes reutilizables para mejorar mantenibilidad
  * @param {string} type - 'ingreso' o 'egreso'
  * @param {string} perfilId - ID del perfil actual
  * @param {object} initialData - Datos iniciales (de OCR, voz, o edición)
@@ -120,6 +128,7 @@ export default function TransactionForm({
     }));
   };
 
+  // Toggle de día de la semana
   const handleDayToggle = (dayIndex) => {
     setFormData(prev => {
       const dias = [...prev.diasSemana];
@@ -255,9 +264,6 @@ export default function TransactionForm({
     }
   };
 
-  // Generar días del mes
-  const diasMes = Array.from({ length: 31 }, (_, i) => i + 1);
-
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
@@ -281,190 +287,89 @@ export default function TransactionForm({
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Monto */}
+          {/* Campo de Monto */}
           <Card style={styles.card}>
-            <Text style={styles.label}>Monto *</Text>
-            <View style={styles.montoContainer}>
-              <Text style={styles.montoSymbol}>$</Text>
-              <TextInput
-                style={[styles.montoInput, errors.monto && styles.inputError]}
-                value={formData.monto}
-                onChangeText={(v) => handleChange('monto', v)}
-                placeholder="0.00"
-                keyboardType="decimal-pad"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-            {errors.monto && <Text style={styles.errorText}>{errors.monto}</Text>}
+            <AmountField
+              value={formData.monto}
+              onChangeText={(v) => handleChange('monto', v)}
+              error={errors.monto}
+            />
           </Card>
 
-          {/* Descripción */}
+          {/* Campo de Descripción */}
           <Card style={styles.card}>
-            <Text style={styles.label}>Descripción *</Text>
-            <TextInput
-              style={[styles.textInput, errors.descripcion && styles.inputError]}
+            <DescriptionField
               value={formData.descripcion}
               onChangeText={(v) => handleChange('descripcion', v)}
+              error={errors.descripcion}
               placeholder={isIngreso ? "Ej: Salario mensual" : "Ej: Compra supermercado"}
-              placeholderTextColor="#9ca3af"
-              maxLength={100}
             />
-            {errors.descripcion && <Text style={styles.errorText}>{errors.descripcion}</Text>}
           </Card>
 
-          {/* Categoría */}
+          {/* Selector de Categoría */}
           <Card style={styles.card}>
-            <Text style={styles.label}>Categoría</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.categoriesRow}>
-                {categorias.map(cat => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.categoryChip,
-                      formData.categoria === cat && styles.categoryChipActive
-                    ]}
-                    onPress={() => handleChange('categoria', cat)}
-                  >
-                    <Text style={[
-                      styles.categoryText,
-                      formData.categoria === cat && styles.categoryTextActive
-                    ]}>{cat}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+            <CategorySelector
+              value={formData.categoria}
+              onChange={(v) => handleChange('categoria', v)}
+              categories={categorias}
+            />
           </Card>
 
-          {/* Frecuencia */}
+          {/* Selector de Frecuencia */}
           <Card style={styles.card}>
-            <Text style={styles.label}>Frecuencia</Text>
-            <View style={styles.frequencyContainer}>
-              {FRECUENCIAS.map(freq => (
-                <TouchableOpacity
-                  key={freq.value}
-                  style={[
-                    styles.frequencyBtn,
-                    formData.frecuencia === freq.value && styles.frequencyBtnActive
-                  ]}
-                  onPress={() => handleFrecuenciaChange(freq.value)}
-                >
-                  <Text style={styles.frequencyIcon}>{freq.icon}</Text>
-                  <Text style={[
-                    styles.frequencyText,
-                    formData.frecuencia === freq.value && styles.frequencyTextActive
-                  ]}>{freq.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <FrequencySelector
+              value={formData.frecuencia}
+              onChange={handleFrecuenciaChange}
+              frequencies={FRECUENCIAS}
+            />
           </Card>
 
           {/* Opciones según frecuencia */}
           {formData.frecuencia === 'semanal' && (
             <Card style={styles.card}>
-              <Text style={styles.label}>Días de la semana</Text>
-              <View style={styles.daysRow}>
-                {DIAS_SEMANA.map((dia, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    style={[
-                      styles.dayBtn,
-                      formData.diasSemana.includes(idx) && styles.dayBtnActive
-                    ]}
-                    onPress={() => handleDayToggle(idx)}
-                  >
-                    <Text style={[
-                      styles.dayText,
-                      formData.diasSemana.includes(idx) && styles.dayTextActive
-                    ]}>{dia}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              {errors.diasSemana && <Text style={styles.errorText}>{errors.diasSemana}</Text>}
+              <WeekDaySelector
+                selectedDays={formData.diasSemana}
+                onToggle={handleDayToggle}
+                error={errors.diasSemana}
+              />
             </Card>
           )}
 
           {formData.frecuencia === 'mensual' && (
             <Card style={styles.card}>
-              <Text style={styles.label}>Día del mes</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.monthDaysRow}>
-                  {diasMes.map(dia => (
-                    <TouchableOpacity
-                      key={dia}
-                      style={[
-                        styles.monthDayBtn,
-                        formData.diaMes === dia && styles.monthDayBtnActive
-                      ]}
-                      onPress={() => handleChange('diaMes', dia)}
-                    >
-                      <Text style={[
-                        styles.monthDayText,
-                        formData.diaMes === dia && styles.monthDayTextActive
-                      ]}>{dia}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
+              <MonthDaySelector
+                selectedDay={formData.diaMes}
+                onChange={(v) => handleChange('diaMes', v)}
+              />
             </Card>
           )}
 
           {(formData.frecuencia === 'ocasional' || formData.frecuencia === 'anual') && (
             <Card style={styles.card}>
-              <Text style={styles.label}>Fecha</Text>
-              <TextInput
-                style={styles.textInput}
+              <DateField
                 value={formData.fechaEspecifica}
                 onChangeText={(v) => handleChange('fechaEspecifica', v)}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#9ca3af"
               />
-              <Text style={styles.helperText}>Formato: 2026-01-19</Text>
             </Card>
           )}
 
           {/* Notificación (solo para recurrentes) */}
           {formData.frecuencia !== 'ocasional' && (
             <Card style={styles.card}>
-              <View style={styles.switchRow}>
-                <View>
-                  <Text style={styles.switchLabel}>🔔 Notificación</Text>
-                  <Text style={styles.switchSubLabel}>Recibir recordatorio</Text>
-                </View>
-                <Switch
-                  value={formData.notificacionActiva}
-                  onValueChange={(v) => handleChange('notificacionActiva', v)}
-                  trackColor={{ false: '#e5e7eb', true: COLORS.primary + '60' }}
-                  thumbColor={formData.notificacionActiva ? COLORS.primary : '#9ca3af'}
-                />
-              </View>
+              <NotificationSwitch
+                value={formData.notificacionActiva}
+                onValueChange={(v) => handleChange('notificacionActiva', v)}
+              />
             </Card>
           )}
 
           {/* Clasificación (solo egresos) */}
           {!isIngreso && (
             <Card style={styles.card}>
-              <Text style={styles.label}>Clasificación</Text>
-              <View style={styles.classificationRow}>
-                {['prioritario', 'necesario', 'prescindible'].map(cls => (
-                  <TouchableOpacity
-                    key={cls}
-                    style={[
-                      styles.classificationBtn,
-                      formData.clasificacion === cls && styles.classificationBtnActive
-                    ]}
-                    onPress={() => handleChange('clasificacion', cls)}
-                  >
-                    <Text style={[
-                      styles.classificationText,
-                      formData.clasificacion === cls && styles.classificationTextActive
-                    ]}>
-                      {cls === 'prioritario' ? '⭐ Prioritario' : 
-                       cls === 'necesario' ? '✓ Necesario' : '○ Prescindible'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <ClassificationSelector
+                value={formData.clasificacion}
+                onChange={(v) => handleChange('clasificacion', v)}
+              />
             </Card>
           )}
 
@@ -534,200 +439,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
   },
-  card: {
-    marginBottom: 16,
-    padding: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 10,
-  },
-  montoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    paddingHorizontal: 16,
-  },
-  montoSymbol: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#6b7280',
-    marginRight: 8,
-  },
-  montoInput: {
-    flex: 1,
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#111827',
-    paddingVertical: 16,
-  },
-  textInput: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#111827',
-  },
-  inputError: {
-    borderColor: COLORS.danger,
-  },
-  errorText: {
-    color: COLORS.danger,
-    fontSize: 12,
-    marginTop: 6,
-  },
-  helperText: {
-    color: '#9ca3af',
-    fontSize: 12,
-    marginTop: 6,
-  },
-  categoriesRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  categoryChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  categoryChipActive: {
-    backgroundColor: COLORS.primary + '15',
-    borderColor: COLORS.primary,
-  },
-  categoryText: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  categoryTextActive: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  frequencyContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  frequencyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: '#f3f4f6',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  frequencyBtnActive: {
-    backgroundColor: COLORS.primary + '15',
-    borderColor: COLORS.primary,
-  },
-  frequencyIcon: {
-    fontSize: 16,
-    marginRight: 6,
-  },
-  frequencyText: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  frequencyTextActive: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  daysRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dayBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dayBtnActive: {
-    backgroundColor: COLORS.primary,
-  },
-  dayText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  dayTextActive: {
-    color: '#fff',
-  },
-  monthDaysRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  monthDayBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  monthDayBtnActive: {
-    backgroundColor: COLORS.primary,
-  },
-  monthDayText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  monthDayTextActive: {
-    color: '#fff',
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  switchLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  switchSubLabel: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginTop: 2,
-  },
-  classificationRow: {
-    gap: 10,
-  },
-  classificationBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: '#f3f4f6',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  classificationBtnActive: {
-    backgroundColor: COLORS.primary + '15',
-    borderColor: COLORS.primary,
-  },
-  classificationText: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  classificationTextActive: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
   footer: {
     flexDirection: 'row',
     padding: 16,
@@ -736,6 +447,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
     gap: 12,
+  },
+  card: {
+    marginBottom: 16,
+    padding: 16,
   },
   cancelBtn: {
     flex: 1,

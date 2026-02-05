@@ -2,6 +2,7 @@ export { default as DashboardScreen } from './DashboardScreen.jsx';
 export { default as NuevoIngresoScreen } from './NuevoIngresoScreen.jsx';
 export { default as NuevoEgresoScreen } from './NuevoEgresoScreen.jsx';
 export { default as HistorialScreen } from './HistorialScreen.jsx';
+export { default as EditarHistorialScreen } from './EditarHistorialScreen.jsx';
 export { default as AdministrarRegistrosScreen } from './AdministrarRegistrosScreen.jsx';
 export { default as PresupuestosScreen } from './PresupuestosScreen.jsx';
 export { default as PlanAhorroScreen } from './PlanAhorroScreen.jsx';

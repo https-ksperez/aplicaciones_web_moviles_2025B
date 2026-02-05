@@ -14,6 +14,7 @@ import {
   NuevoIngresoScreen,
   NuevoEgresoScreen,
   HistorialScreen,
+  EditarHistorialScreen,
   AdministrarRegistrosScreen,
   PresupuestosScreen,
   PlanAhorroScreen,
@@ -64,6 +65,7 @@ function HomeStack({ navigationRef }) {
       <Stack.Screen name="NuevoIngreso" component={NuevoIngresoScreen} />
       <Stack.Screen name="NuevoEgreso" component={NuevoEgresoScreen} />
       <Stack.Screen name="Historial" component={HistorialScreen} />
+      <Stack.Screen name="EditarHistorial" component={EditarHistorialScreen} />
       <Stack.Screen name="AdministrarRegistros" component={AdministrarRegistrosScreen} />
       <Stack.Screen name="Notificaciones" component={NotificacionesScreen} />
       <Stack.Screen name="RegistroVoz" component={RegistroVozScreen} />
