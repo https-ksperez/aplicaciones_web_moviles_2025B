@@ -42,7 +42,11 @@ export default function ReceiptData({ data, rawText }) {
       {data.fecha && (
         <View style={styles.row}>
           <Text style={styles.label}>Fecha:</Text>
-          <Text style={styles.value}>{data.fecha}</Text>
+          <Text style={styles.value}>
+            {data.fecha instanceof Date 
+              ? data.fecha.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' })
+              : String(data.fecha)}
+          </Text>
         </View>
       )}
 
